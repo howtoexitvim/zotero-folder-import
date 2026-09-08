@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title data-l10n-id="folder-import-dialog-title">Folder Import</title>
+    <link rel="localization" href="folder-import.ftl" />
+    <link rel="stylesheet" href="dialog.css" />
+    <script defer="defer" src="dialog.js"></script>
+  </head>
+  <body>
+    <main>
+      <section id="preview-view">
+        <header>
+          <h1 data-l10n-id="folder-import-preview-title">Review import</h1>
+          <p data-l10n-id="folder-import-preview-description">Nothing is written until you confirm.</p>
+        </header>
+
+        <dl class="paths">
+          <dt data-l10n-id="folder-import-source">Source</dt><dd id="source-path"></dd>
+          <dt data-l10n-id="folder-import-destination">Destination</dt><dd id="destination-path"></dd>
+        </dl>
+
+        <div class="metrics">
+          <div><strong id="count-total">0</strong><span data-l10n-id="folder-import-files">files</span></div>
+          <div><strong id="count-size">0 B</strong><span data-l10n-id="folder-import-total-size">total size</span></div>
+          <div><strong id="count-new">0</strong><span data-l10n-id="folder-import-new">new</span></div>
+          <div><strong id="count-reused">0</strong><span data-l10n-id="folder-import-reused">reused</span></div>
+          <div><strong id="count-conflicts">0</strong><span data-l10n-id="folder-import-conflicts">conflicts</span></div>
+          <div><strong id="count-unsupported">0</strong><span data-l10n-id="folder-import-unsupported">unsupported</span></div>
+          <div><strong id="count-errors">0</strong><span data-l10n-id="folder-import-errors">errors</span></div>
+        </div>
+
+        <details>
+          <summary data-l10n-id="folder-import-collections-to-create">Collections to create</summary>
+          <ul id="collection-list"></ul>
+        </details>
+
+        <details id="scan-error-details" hidden="hidden">
+          <summary data-l10n-id="folder-import-scan-errors">Files unavailable during scanning</summary>
+          <ul id="scan-error-list" class="errors"></ul>
+        </details>
+
+        <div class="conflict-toolbar">
+          <label><input id="apply-all" type="checkbox" /> <span data-l10n-id="folder-import-apply-all">Apply this choice to all remaining conflicts</span></label>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-l10n-id="folder-import-file">File</th>
+                <th data-l10n-id="folder-import-type">Type</th>
+                <th data-l10n-id="folder-import-size">Size</th>
+                <th data-l10n-id="folder-import-status">Status</th>
+                <th data-l10n-id="folder-import-action">Action</th>
+              </tr>
+            </thead>
+            <tbody id="file-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="progress-view" hidden="hidden">
+        <h1 id="progress-title" data-l10n-id="folder-import-importing">Importing…</h1>
+        <progress id="progress-meter" value="0" max="1"></progress>
+        <p id="progress-label"></p>
+        <p id="result-summary"></p>
+        <ul id="result-errors" class="errors"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <button id="cancel-button" data-l10n-id="folder-import-cancel">Cancel</button>
+      <button id="import-button" class="primary" data-l10n-id="folder-import-confirm">Import</button>
+      <button id="close-button" class="primary" hidden="hidden" data-l10n-id="folder-import-close">Close</button>
+    </footer>
+  </body>
+</html>
