@@ -8,6 +8,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function fileBaseName(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(0, dot) : name;
@@ -65,12 +69,20 @@ export async function getExistingAttachments(
   onError?: (error: { path: string; message: string }) => void,
 ): Promise<ExistingAttachment[]> {
   const sourceSizes = new Set(sourceFiles.map((file) => file.size));
-  const items = await Zotero.Items.getAll(libraryID, false, false, false);
+  const all = await Zotero.Items.getAll(libraryID, false, false, false);
+  // Narrow to stored file attachments before loading data types or touching the
+  // disk; loading every item in a large library blocks the UI thread for
+  // minutes and looks like a hang.
+  const items = all.filter((item: any) => item.isStoredFileAttachment?.());
   const attachments: ExistingAttachment[] = [];
+  if (!items.length) return attachments;
   await Zotero.Items.loadDataTypes(items, ["childItems", "collections"]);
 
+  let processed = 0;
   for (const item of items) {
-    if (!item.isStoredFileAttachment?.()) continue;
+    // Yield periodically so Zotero stays responsive while we stat and hash.
+    processed += 1;
+    if (processed % 25 === 0) await yieldToEventLoop();
     const path = await item.getFilePathAsync();
     if (!path) continue;
     const name = PathUtils.filename(path);

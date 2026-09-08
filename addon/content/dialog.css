@@ -83,3 +83,13 @@ button.primary { font-weight: 600; }
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(4, 1fr); }
 }
+
+.fatal {
+  margin: 24px;
+  padding: 16px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  color: #b00020;
+  background: rgba(176, 0, 32, 0.08);
+  border-radius: 6px;
+}

@@ -9,7 +9,8 @@ import { build } from "esbuild";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const buildDir = path.join(root, "build");
 const distDir = path.join(root, "dist");
-const xpi = path.join(distDir, "folder-import-0.1.1.xpi");
+const manifest = JSON.parse(await readFile(path.join(root, "addon/manifest.json"), "utf8"));
+const xpi = path.join(distDir, `folder-import-${manifest.version}.xpi`);
 
 await rm(buildDir, { recursive: true, force: true });
 await rm(distDir, { recursive: true, force: true });

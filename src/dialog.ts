@@ -15,33 +15,48 @@ interface DialogData {
   ): Promise<ImportResult>;
 }
 
-const data = ((window as any).arguments?.[0] as any)?.wrappedJSObject as DialogData;
-let files: PlannedFile[] = data.plan.files.map((file) => ({ ...file }));
+function readDialogData(): DialogData {
+  const argument = (window as any).arguments?.[0];
+  if (!argument) throw new Error("Folder Import dialog was opened without data");
+  // openDialog may hand back the object directly or wrapped in an XPCOM
+  // holder depending on how the caller passed it; accept both.
+  const unwrapped = argument.wrappedJSObject ?? argument;
+  if (!unwrapped?.plan) throw new Error("Folder Import dialog data is missing an import plan");
+  return unwrapped as DialogData;
+}
 
-const zh = data.locale.toLowerCase().startsWith("zh");
-const words = zh ? {
-  new: "新导入",
-  reused: "复用",
-  conflict: "冲突",
-  annotated: "含标注或存在多个旧附件，不能替换",
-  unresolved: "请选择…",
-  replace: "替换",
-  ignore: "忽略",
-  keepBoth: "两者都保留",
-  done: "导入完成",
-  failed: "失败",
-} : {
-  new: "New",
-  reused: "Reuse",
-  conflict: "Conflict",
-  annotated: "Annotations or multiple existing files; Replace unavailable",
-  unresolved: "Choose…",
-  replace: "Replace",
-  ignore: "Ignore",
-  keepBoth: "Keep Both",
-  done: "Import complete",
-  failed: "Failed",
-};
+let data: DialogData;
+let files: PlannedFile[] = [];
+let zh = false;
+let words: Record<string, string>;
+
+function initWords(): void {
+  words = zh
+    ? {
+      new: "新导入",
+      reused: "复用",
+      conflict: "冲突",
+      annotated: "含标注或存在多个旧附件，不能替换",
+      unresolved: "请选择…",
+      replace: "替换",
+      ignore: "忽略",
+      keepBoth: "两者都保留",
+      done: "导入完成",
+      failed: "失败",
+    }
+    : {
+      new: "New",
+      reused: "Reuse",
+      conflict: "Conflict",
+      annotated: "Annotations or multiple existing files; Replace unavailable",
+      unresolved: "Choose…",
+      replace: "Replace",
+      ignore: "Ignore",
+      keepBoth: "Keep Both",
+      done: "Import complete",
+      failed: "Failed",
+    };
+}
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -215,11 +230,39 @@ async function beginImport(): Promise<void> {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  renderSummary();
-  renderFiles();
-  updateImportButton();
-  byId("cancel-button").addEventListener("click", () => window.close());
-  byId("close-button").addEventListener("click", () => window.close());
-  byId("import-button").addEventListener("click", () => void beginImport());
-});
+function reportFatal(error: unknown): void {
+  // A dialog that throws during setup would otherwise stay blank with no way
+  // to tell what went wrong, so paint the failure into the window itself.
+  const message = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
+  const pre = document.createElement("pre");
+  pre.className = "fatal";
+  pre.textContent = message;
+  document.body?.replaceChildren(pre);
+  const close = document.createElement("button");
+  close.textContent = "Close";
+  close.addEventListener("click", () => window.close());
+  document.body?.append(close);
+}
+
+function start(): void {
+  try {
+    data = readDialogData();
+    files = data.plan.files.map((file) => ({ ...file }));
+    zh = (data.locale ?? "en-US").toLowerCase().startsWith("zh");
+    initWords();
+    renderSummary();
+    renderFiles();
+    updateImportButton();
+    byId("cancel-button").addEventListener("click", () => window.close());
+    byId("close-button").addEventListener("click", () => window.close());
+    byId("import-button").addEventListener("click", () => void beginImport());
+  } catch (error) {
+    reportFatal(error);
+  }
+}
+
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", start, { once: true });
+} else {
+  start();
+}

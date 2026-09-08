@@ -25,12 +25,16 @@ function collectionPath(collection: any): string {
 }
 
 function selectedRows(window: any): SelectedRow[] {
-  return window.ZoteroPane.getCollectionTreeRows().map((row: any) => ({
+  // The plural accessor returns every row in the tree; the import target is
+  // whatever the user actually has selected.
+  const row = window.ZoteroPane.getCollectionTreeRow();
+  if (!row) return [];
+  return [{
     type: row.type,
     libraryID: row.ref?.libraryID,
     collectionID: row.isCollection?.() ? row.ref.id : undefined,
     collectionPath: row.isCollection?.() ? collectionPath(row.ref) : undefined,
-  }));
+  }];
 }
 
 function rootName(path: string): string {
