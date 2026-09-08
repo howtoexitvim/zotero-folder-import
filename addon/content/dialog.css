@@ -56,6 +56,19 @@
 
 .group { margin-bottom: 16px; }
 .list-item { padding: 1px 0; }
+
+/*
+ * Deep folder trees can produce a hundred-plus collection paths, and an
+ * uncapped list pushed the file table and the footer off-screen entirely.
+ * Cap the height and let the list scroll on its own.
+ */
+.list.scrollable {
+  max-height: 132px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
 .errors { color: #cf222e; overflow-wrap: anywhere; }
 
 #conflict-toolbar { margin-bottom: 16px; }

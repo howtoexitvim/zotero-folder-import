@@ -93,6 +93,26 @@ describe("Zotero install manifest", () => {
     expect(script).toContain('byId("apply-all-replace").setAttribute("label"');
   });
 
+  it("caps long lists so they cannot push the table and footer off-screen", async () => {
+    const css = await readFile(
+      new URL("../addon/content/dialog.css", import.meta.url),
+      "utf8",
+    );
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
+
+    // A deep source tree produced 85+ "Collections to create" rows, which grew
+    // the page until the file table and the Import button were unreachable.
+    expect(css).toMatch(/\.list\.scrollable\s*\{[^}]*max-height/);
+    expect(css).toMatch(/\.list\.scrollable\s*\{[^}]*overflow:\s*auto/);
+    // Applied to every list that can grow with the input.
+    expect(script).toContain('setScrollable(collections,');
+    expect(script).toContain('setScrollable(scanErrorList,');
+    expect(script).toContain('setScrollable(errors,');
+  });
+
   it("keeps long paths from widening the window", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),

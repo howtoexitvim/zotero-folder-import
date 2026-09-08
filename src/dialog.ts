@@ -196,6 +196,16 @@ function appendCell(row: Element, text: string, className?: string): Element {
   return cell;
 }
 
+/** Above this many rows a list gets its own capped scroller. */
+const LIST_SCROLL_THRESHOLD = 6;
+
+/** Caps a list's height so a long one cannot push the rest of the page away. */
+function setScrollable(list: Element, scrollable: boolean): void {
+  const classes = list.getAttribute("class") ?? "";
+  const base = classes.replace(/\s*\bscrollable\b/g, "");
+  list.setAttribute("class", scrollable ? `${base} scrollable` : base);
+}
+
 function appendListItem(list: Element, text: string): void {
   const item = xul("label");
   item.setAttribute("class", "list-item");
@@ -255,12 +265,26 @@ function renderSummary(): void {
   for (const error of data.scanErrors) {
     appendListItem(scanErrorList, `${error.path}: ${error.message}`);
   }
+  setScrollable(scanErrorList, data.scanErrors.length > LIST_SCROLL_THRESHOLD);
+  setText(
+    byId("lbl-scan-errors"),
+    data.scanErrors.length ? `${words.scanErrors} (${data.scanErrors.length})` : words.scanErrors,
+  );
 
   const collections = byId("collection-list");
   collections.replaceChildren();
   for (const segments of data.plan.collectionsToCreate) {
     appendListItem(collections, segments.join(" / "));
   }
+  // A deep tree can yield a hundred-plus paths. Cap the list once it stops
+  // being scannable at a glance, so it cannot push the table off-screen.
+  setScrollable(collections, data.plan.collectionsToCreate.length > LIST_SCROLL_THRESHOLD);
+  setText(
+    byId("lbl-collections"),
+    data.plan.collectionsToCreate.length
+      ? `${words.collections} (${data.plan.collectionsToCreate.length})`
+      : words.collections,
+  );
   if (!data.plan.collectionsToCreate.length) {
     appendListItem(collections, words.allExist);
   }
@@ -411,6 +435,7 @@ function renderResult(result: ImportResult): void {
   for (const error of result.errors) {
     appendListItem(errors, `${error.path}: ${error.message}`);
   }
+  setScrollable(errors, result.errors.length > LIST_SCROLL_THRESHOLD);
   resizeToContent();
 }
 
