@@ -40,7 +40,8 @@
 .group { margin: 12px 0; }
 .group-title { font-weight: 600; display: block; margin-bottom: 6px; }
 .list-item { padding: 1px 0; }
-.conflict-toolbar { min-height: 32px; padding: 8px 0; }
+#conflict-toolbar { margin: 14px 0; }
+#conflict-hint { font-weight: 400; color: GrayText; margin-bottom: 6px; }
 
 .table {
   border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
@@ -55,7 +56,6 @@
 
 .thead { font-weight: 600; padding-top: 10px; }
 .col-file   { flex: 1; min-width: 240px; }
-.col-type   { width: 70px; }
 .col-size   { width: 100px; }
 .col-status { width: 110px; }
 .col-action { width: 230px; }

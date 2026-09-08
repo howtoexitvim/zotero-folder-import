@@ -9,9 +9,6 @@
     height="760"
     onload="FolderImportDialog.init()"
 >
-  <linkset>
-    <html:link rel="localization" href="folder-import.ftl" />
-  </linkset>
   <script src="chrome://global/content/customElements.js" />
   <script src="chrome://folder-import/content/dialog.js" />
 
@@ -24,8 +21,7 @@
   <vbox id="folder-import-root" flex="1">
     <vbox id="scroll-area" flex="1">
       <vbox id="preview-view" flex="1">
-        <label id="preview-title" class="heading" data-l10n-id="folder-import-preview-title" value="Review import" />
-        <label id="preview-subtitle" class="subtitle" data-l10n-id="folder-import-preview-description" value="Nothing is written until you confirm." />
+        <label id="preview-title" class="heading" value="Review import" />
 
         <!--
           Each path gets its own full-width row and crops in the middle, so a
@@ -34,50 +30,51 @@
         -->
         <vbox class="paths">
           <hbox class="path-row" align="center">
-            <label class="path-label" data-l10n-id="folder-import-source" value="Source" />
+            <label id="lbl-source" class="path-label" value="Source" />
             <label id="source-path" class="path-value" crop="center" flex="1" />
           </hbox>
           <hbox class="path-row" align="center">
-            <label class="path-label" data-l10n-id="folder-import-destination" value="Destination" />
+            <label id="lbl-destination" class="path-label" value="Destination" />
             <label id="destination-path" class="path-value" crop="center" flex="1" />
           </hbox>
         </vbox>
 
         <hbox class="metrics" align="center">
-          <vbox class="metric"><label id="count-total" class="num" value="0" /><label data-l10n-id="folder-import-files" value="files" /></vbox>
-          <vbox class="metric"><label id="count-size" class="num" value="0 B" /><label data-l10n-id="folder-import-total-size" value="total size" /></vbox>
-          <vbox class="metric"><label id="count-new" class="num" value="0" /><label data-l10n-id="folder-import-new" value="new" /></vbox>
-          <vbox class="metric"><label id="count-reused" class="num" value="0" /><label data-l10n-id="folder-import-reused" value="reused" /></vbox>
-          <vbox class="metric"><label id="count-conflicts" class="num" value="0" /><label data-l10n-id="folder-import-conflicts" value="conflicts" /></vbox>
-          <vbox class="metric"><label id="count-unsupported" class="num" value="0" /><label data-l10n-id="folder-import-unsupported" value="unsupported" /></vbox>
-          <vbox class="metric"><label id="count-errors" class="num" value="0" /><label data-l10n-id="folder-import-errors" value="errors" /></vbox>
+          <vbox class="metric"><label id="count-total" class="num" value="0" /><label id="lbl-files" value="files" /></vbox>
+          <vbox class="metric"><label id="count-size" class="num" value="0 B" /><label id="lbl-size" value="total size" /></vbox>
+          <vbox class="metric"><label id="count-new" class="num" value="0" /><label id="lbl-new" value="new" /></vbox>
+          <vbox class="metric"><label id="count-reused" class="num" value="0" /><label id="lbl-reused" value="already in library" /></vbox>
+          <vbox class="metric"><label id="count-conflicts" class="num" value="0" /><label id="lbl-conflicts" value="conflicts" /></vbox>
+          <vbox class="metric"><label id="count-unsupported" class="num" value="0" /><label id="lbl-unsupported" value="unsupported" /></vbox>
+          <vbox class="metric"><label id="count-errors" class="num" value="0" /><label id="lbl-errors" value="errors" /></vbox>
         </hbox>
 
         <vbox class="group">
-          <label class="group-title" data-l10n-id="folder-import-collections-to-create" value="Collections to create" />
+          <label id="lbl-collections" class="group-title" value="Collections to create" />
           <vbox id="collection-list" class="list" />
         </vbox>
 
         <vbox id="scan-error-group" class="group" hidden="true">
-          <label class="group-title" data-l10n-id="folder-import-scan-errors" value="Files unavailable during scanning" />
+          <label id="lbl-scan-errors" class="group-title" value="Files unavailable during scanning" />
           <vbox id="scan-error-list" class="list errors" />
         </vbox>
 
-        <hbox class="conflict-toolbar" align="center">
-          <!--
-            No data-l10n-id here: DOM localization clears a checkbox's built-in
-            label before the plugin bundle resolves, leaving an unlabelled box.
-            The label is set from script instead, like the menu item.
-          -->
-          <checkbox id="apply-all" label="Apply this choice to all remaining conflicts" />
-        </hbox>
+        <!--
+          Conflict controls only appear when there actually are conflicts.
+          No data-l10n-id anywhere in this file: the plugin's Fluent bundle does
+          not resolve here, and DOM localization then blanks a checkbox's label
+          and concatenates unresolved ids into the text layer.
+        -->
+        <vbox id="conflict-toolbar" class="group" hidden="true">
+          <label id="conflict-hint" class="group-title" />
+          <checkbox id="apply-all" />
+        </vbox>
 
         <hbox class="thead">
-          <label class="col-file" data-l10n-id="folder-import-file" value="File" />
-          <label class="col-type" data-l10n-id="folder-import-type" value="Type" />
-          <label class="col-size" data-l10n-id="folder-import-size" value="Size" />
-          <label class="col-status" data-l10n-id="folder-import-status" value="Status" />
-          <label class="col-action" data-l10n-id="folder-import-action" value="Action" />
+          <label id="head-file" class="col-file" value="File" />
+          <label id="head-size" class="col-size" value="Size" />
+          <label id="head-status" class="col-status" value="Status" />
+          <label id="head-action" class="col-action" value="Action" hidden="true" />
         </hbox>
         <vbox id="file-table-scroll" class="table" flex="1" style="overflow: auto;">
           <vbox id="file-table-body" />
@@ -85,7 +82,7 @@
       </vbox>
 
       <vbox id="progress-view" flex="1" hidden="true">
-        <label id="progress-title" class="heading" data-l10n-id="folder-import-importing" value="Importing…" />
+        <label id="progress-title" class="heading" value="Importing…" />
         <html:progress id="progress-meter" value="0" max="1" />
         <label id="progress-label" crop="center" />
         <label id="result-summary" />
@@ -94,9 +91,9 @@
     </vbox>
 
     <hbox id="footer" pack="end" align="center">
-      <button id="cancel-button" data-l10n-id="folder-import-cancel" label="Cancel" />
-      <button id="import-button" default="true" data-l10n-id="folder-import-confirm" label="Import" />
-      <button id="close-button" hidden="true" data-l10n-id="folder-import-close" label="Close" />
+      <button id="cancel-button" label="Cancel" />
+      <button id="import-button" default="true" label="Import" />
+      <button id="close-button" hidden="true" label="Close" />
     </hbox>
   </vbox>
 </window>

@@ -58,6 +58,15 @@ describe("menu localization", () => {
 });
 
 describe("import progress", () => {
+  it("opens the dialog non-modally", async () => {
+    const controller = await controllerSource;
+
+    // A modal dialog spins a nested event loop that blocks the opener, where
+    // the import actually runs -- so the progress bar froze and work only
+    // resumed when the window was closed.
+    expect(controller).not.toMatch(/"chrome[^"]*\bmodal\b/);
+  });
+
   it("yields to the event loop between files", async () => {
     const importer = await readFile(
       new URL("../src/core/importer.ts", import.meta.url),

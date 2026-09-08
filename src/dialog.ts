@@ -43,7 +43,29 @@ function initWords(): void {
       keepBoth: "两者都保留",
       done: "导入完成",
       failed: "失败",
-      applyAll: "将此选择应用到其余冲突",
+      applyAll: "对其余冲突也这样处理",
+      conflictHint: "以下文件在目标 collection 里已有同名文件，请选择如何处理：",
+      title: "检查导入",
+      colSource: "来源",
+      colDestination: "目标",
+      colFile: "文件",
+      colSize: "大小",
+      colStatus: "状态",
+      colAction: "操作",
+      mFiles: "个文件",
+      mSize: "总大小",
+      mNew: "新导入",
+      mReused: "已在库中",
+      mConflicts: "冲突",
+      mUnsupported: "不支持",
+      mErrors: "错误",
+      collections: "将创建的 collection",
+      scanErrors: "扫描时无法读取的文件",
+      allExist: "全部使用现有 collection",
+      importing: "正在导入…",
+      cancel: "取消",
+      confirm: "导入",
+      close: "关闭",
     }
     : {
       new: "New",
@@ -56,7 +78,29 @@ function initWords(): void {
       keepBoth: "Keep Both",
       done: "Import complete",
       failed: "Failed",
-      applyAll: "Apply this choice to all remaining conflicts",
+      applyAll: "Do the same for the remaining conflicts",
+      conflictHint: "These files already exist under the same name in the target collection. Choose what to do:",
+      title: "Review import",
+      colSource: "Source",
+      colDestination: "Destination",
+      colFile: "File",
+      colSize: "Size",
+      colStatus: "Status",
+      colAction: "Action",
+      mFiles: "files",
+      mSize: "total size",
+      mNew: "new",
+      mReused: "already in library",
+      mConflicts: "conflicts",
+      mUnsupported: "unsupported",
+      mErrors: "errors",
+      collections: "Collections to create",
+      scanErrors: "Files unavailable during scanning",
+      allExist: "All collections already exist",
+      importing: "Importing…",
+      cancel: "Cancel",
+      confirm: "Import",
+      close: "Close",
     };
 }
 
@@ -141,6 +185,33 @@ function appendListItem(list: Element, text: string): void {
 function renderSummary(): void {
   setPath(byId("source-path"), data.sourcePath);
   setPath(byId("destination-path"), data.destinationPath);
+  setText(byId("preview-title"), words.title);
+  setText(byId("lbl-source"), words.colSource);
+  setText(byId("lbl-destination"), words.colDestination);
+  setText(byId("lbl-files"), words.mFiles);
+  setText(byId("lbl-size"), words.mSize);
+  setText(byId("lbl-new"), words.mNew);
+  setText(byId("lbl-reused"), words.mReused);
+  setText(byId("lbl-conflicts"), words.mConflicts);
+  setText(byId("lbl-unsupported"), words.mUnsupported);
+  setText(byId("lbl-errors"), words.mErrors);
+  setText(byId("lbl-collections"), words.collections);
+  setText(byId("lbl-scan-errors"), words.scanErrors);
+  setText(byId("head-file"), words.colFile);
+  setText(byId("head-size"), words.colSize);
+  setText(byId("head-status"), words.colStatus);
+  setText(byId("head-action"), words.colAction);
+  setText(byId("progress-title"), words.importing);
+  byId("cancel-button").setAttribute("label", words.cancel);
+  byId("import-button").setAttribute("label", words.confirm);
+  byId("close-button").setAttribute("label", words.close);
+
+  // Conflict controls are meaningless with no conflicts, so keep them and the
+  // Action column out of the way entirely until there is something to resolve.
+  const hasConflicts = data.plan.summary.conflict > 0;
+  setHidden(byId("conflict-toolbar"), !hasConflicts);
+  setHidden(byId("head-action"), !hasConflicts);
+  setText(byId("conflict-hint"), words.conflictHint);
   byId("apply-all").setAttribute("label", words.applyAll);
   setText(byId("count-total"), String(data.plan.summary.total));
   setText(byId("count-size"), formatBytes(data.plan.summary.bytes));
@@ -169,6 +240,7 @@ function renderSummary(): void {
 
 function renderFiles(): void {
   const body = byId("file-table-body");
+  const anyConflicts = files.some((file) => file.classification === "conflict");
   body.replaceChildren();
   files.forEach((file, index) => {
     const row = xul("hbox");
@@ -177,7 +249,6 @@ function renderFiles(): void {
     const fileCell = appendCell(row, file.relativePath, "col-file");
     fileCell.setAttribute("crop", "center");
     fileCell.setAttribute("tooltiptext", file.relativePath);
-    appendCell(row, file.extension.toUpperCase(), "col-type");
     appendCell(row, formatBytes(file.size), "col-size");
     const status = file.classification === "new"
       ? words.new
@@ -187,7 +258,7 @@ function renderFiles(): void {
     appendCell(row, status, `col-status status-${file.classification}`);
 
     if (file.classification !== "conflict") {
-      appendCell(row, "", "col-action");
+      if (anyConflicts) appendCell(row, "", "col-action");
       body.append(row);
       return;
     }

@@ -85,11 +85,12 @@ describe("Zotero install manifest", () => {
       "utf8",
     );
 
-    // DOM localization clears a XUL checkbox's built-in label before the
-    // plugin bundle resolves, so the box rendered with no text at all.
-    const checkbox = dialog.match(/<checkbox[^>]*>/)?.[0] ?? "";
-    expect(checkbox).not.toContain("data-l10n-id");
-    expect(checkbox).toContain("label=");
+    // The plugin's Fluent bundle does not resolve in this dialog. Leaving
+    // data-l10n-id on elements blanked the checkbox label and leaked
+    // concatenated ids ("confirm.SourceDestinationfilestotal") into the text
+    // layer, visible via macOS force-touch lookup. All text is set from script.
+    expect(dialog).not.toMatch(/data-l10n-id=/);
+    expect(dialog).not.toContain('rel="localization"');
     expect(script).toContain('byId("apply-all").setAttribute("label"');
   });
 
@@ -110,17 +111,22 @@ describe("Zotero install manifest", () => {
     expect(script).toContain('setAttribute("tooltiptext", text)');
   });
 
-  it("references Fluent files by bare filename", async () => {
+  it("hides conflict controls until there are conflicts", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),
       "utf8",
     );
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
 
-    // Zotero auto-registers locale/<locale>/*.ftl for every plugin and keys the
-    // resource by bare filename (Zotero.Plugins registerLocales), so the href
-    // must not carry a locale/ prefix and the manifest needs no localization
-    // key of its own.
-    expect(dialog).toContain('href="folder-import.ftl"');
+    // A global "apply to all" checkbox and an Action column are noise when
+    // every file is new, which is the common case.
+    expect(dialog).toMatch(/id="conflict-toolbar"[^>]*hidden="true"/);
+    expect(dialog).toMatch(/id="head-action"[^>]*hidden="true"/);
+    expect(script).toContain('setHidden(byId("conflict-toolbar"), !hasConflicts)');
+    expect(script).toContain('setHidden(byId("head-action"), !hasConflicts)');
   });
 
   it("keeps the built XPI filename in step with the manifest version", async () => {

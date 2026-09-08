@@ -175,7 +175,10 @@ export class FolderImportController {
     window.openDialog(
       `chrome://${CHROME_PACKAGE}/content/dialog.xhtml`,
       "folder-import-dialog",
-      "chrome,centerscreen,resizable,modal,width=1000,height=760",
+      // Not modal: a modal dialog spins a nested event loop that blocks this
+      // window, so the import -- which runs on this side -- could not proceed
+      // and the progress bar sat frozen until the dialog was closed.
+      "chrome,centerscreen,resizable,dialog=no,width=1000,height=760",
       dialogData,
     );
   }
