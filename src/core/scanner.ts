@@ -1,3 +1,9 @@
+/**
+ * Walks a source folder and collects the files worth importing. Pure apart from
+ * the injected FileSystemPort, so it can be tested without Zotero.
+ */
+
+/** File types this plugin imports. */
 export type SupportedExtension = "pdf" | "epub";
 
 export interface DirectoryEntry {
@@ -7,16 +13,19 @@ export interface DirectoryEntry {
   symlink?: boolean;
 }
 
+/** Size in bytes and last-modified time, used to detect changes after preview. */
 export interface FileStat {
   size: number;
   mtime: number;
 }
 
+/** The filesystem operations the scanner needs; backed by Zotero at runtime. */
 export interface FileSystemPort {
   list(path: string): Promise<DirectoryEntry[]>;
   stat(path: string): Promise<FileStat>;
 }
 
+/** One file found on disk. md5 is filled in later, only when needed. */
 export interface SourceFile extends FileStat {
   absolutePath: string;
   relativePath: string;
@@ -30,6 +39,7 @@ export interface ScanError {
   message: string;
 }
 
+/** Outcome of a scan: importable files, skipped files, and per-path failures. */
 export interface ScanResult {
   files: SourceFile[];
   unsupportedCount: number;
@@ -38,10 +48,19 @@ export interface ScanResult {
 
 const SUPPORTED = new Set<SupportedExtension>(["pdf", "epub"]);
 
+/** Joins path segments for the display path shown in the preview. */
 function joinRelative(parent: string, child: string): string {
   return parent ? `${parent}/${child}` : child;
 }
 
+/**
+ * Recursively collects PDF and EPUB files under rootPath.
+ *
+ * Dot-files and symlinks are skipped: symlinks could point outside the chosen
+ * folder or form cycles. A directory that cannot be read is recorded as an
+ * error and the scan continues, so one unreadable folder does not fail the run.
+ * Results are sorted so the preview order is stable.
+ */
 export async function scanFolder(rootPath: string, fs: FileSystemPort): Promise<ScanResult> {
   const files: SourceFile[] = [];
   const errors: ScanError[] = [];
@@ -69,7 +88,7 @@ export async function scanFolder(rootPath: string, fs: FileSystemPort): Promise<
 
       const dot = entry.name.lastIndexOf(".");
       const extension = (dot >= 0 ? entry.name.slice(dot + 1) : "").toLowerCase();
-      if (!SUPPORTED.has(extension as SupportedExtension) || extension === "lnk") {
+      if (!SUPPORTED.has(extension as SupportedExtension)) {
         unsupportedCount += 1;
         continue;
       }

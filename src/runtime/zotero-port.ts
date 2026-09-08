@@ -1,3 +1,8 @@
+/**
+ * The Zotero-facing half of the plugin: implements the scanner and importer
+ * ports against the real Zotero APIs. Everything that touches Zotero lives
+ * here, keeping src/core pure and testable.
+ */
 import type { ImportPort, ImportStoredRequest } from "../core/importer";
 import { normalizeName, type ExistingAttachment, type ExistingCollection } from "../core/planner";
 import type { DirectoryEntry, FileStat, FileSystemPort, SourceFile } from "../core/scanner";
@@ -17,6 +22,7 @@ function fileBaseName(name: string): string {
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
+/** Directory listing and stat, backed by Zotero's file helpers. */
 export class ZoteroFileSystemPort implements FileSystemPort {
   async list(path: string): Promise<DirectoryEntry[]> {
     const entries: DirectoryEntry[] = [];
@@ -37,6 +43,10 @@ export class ZoteroFileSystemPort implements FileSystemPort {
   }
 }
 
+/**
+ * Computes MD5 for each scanned file. A file that cannot be hashed is reported
+ * and dropped rather than failing the whole scan.
+ */
 export async function hashSourceFiles(
   files: SourceFile[],
 ): Promise<{ files: SourceFile[]; errors: Array<{ path: string; message: string }> }> {
@@ -54,6 +64,7 @@ export async function hashSourceFiles(
   return { files: hashed, errors };
 }
 
+/** Flattens the library's collections into the shape the planner expects. */
 export function getLibraryCollections(libraryID: number): ExistingCollection[] {
   return Zotero.Collections.getByLibrary(libraryID, true, false).map((collection: any) => ({
     id: collection.id,
@@ -63,6 +74,14 @@ export function getLibraryCollections(libraryID: number): ExistingCollection[] {
   }));
 }
 
+/**
+ * Collects the library's stored PDF/EPUB attachments so the planner can spot
+ * files that are already present.
+ *
+ * Hashing is the expensive part, so it is skipped unless an attachment's size
+ * matches one of the source files, and Zotero's synced hash is reused when its
+ * recorded mtime still matches the file on disk.
+ */
 export async function getExistingAttachments(
   libraryID: number,
   sourceFiles: SourceFile[],
@@ -126,6 +145,7 @@ export async function getExistingAttachments(
   return attachments;
 }
 
+/** Performs the library writes an import needs. */
 export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort {
   private readonly namesByCollection = new Map<number, Set<string>>();
 
@@ -144,6 +164,7 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     }
   }
 
+  /** Creates the collection path if needed, returning the leaf collection id. */
   async ensureCollection(baseCollectionID: number | undefined, segments: string[]): Promise<number> {
     let parentID = baseCollectionID;
     for (const segment of segments) {
@@ -172,6 +193,7 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     return parentID;
   }
 
+  /** Re-reads an attachment's annotation state just before a Replace. */
   async getAttachmentContext(id: number) {
     const attachment = await Zotero.Items.getAsync(id);
     if (!attachment?.isStoredFileAttachment?.()) throw new Error(`Attachment ${id} is unavailable`);
@@ -183,6 +205,11 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     };
   }
 
+  /**
+   * Copies a file into Zotero storage under its original filename. Zotero may
+   * rename on import, so the stored file is renamed back when that happens --
+   * this plugin deliberately preserves source filenames.
+   */
   async importStored(request: ImportStoredRequest): Promise<number> {
     const attachment = await Zotero.Attachments.importFromFile({
       file: request.path,
@@ -233,18 +260,22 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     this.rememberName(collectionID, actualPath ? PathUtils.filename(actualPath) : sourceName);
   }
 
+  /** Moves replaced attachments to the trash (recoverable, never deleted). */
   async trashAttachments(ids: number[]): Promise<void> {
     await Zotero.Items.trashTx(ids);
   }
 
+  /** Filenames already used in a collection, for Keep Both naming. */
   async occupiedNames(collectionID: number): Promise<string[]> {
     return [...(this.namesByCollection.get(collectionID) ?? new Set<string>())];
   }
 
+  /** Queues newly imported files for full-text indexing. */
   async indexAttachments(ids: number[]): Promise<void> {
     await Zotero.FullText.indexItems(ids, { ignoreErrors: true });
   }
 
+  /** Tracks names added during this run so Keep Both stays unique. */
   private rememberName(collectionID: number, name: string): void {
     const names = this.namesByCollection.get(collectionID) ?? new Set<string>();
     names.add(name);

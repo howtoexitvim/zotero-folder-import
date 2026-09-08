@@ -1,7 +1,12 @@
+/**
+ * Zotero bootstrap entry points. Zotero looks these up by name on the plugin's
+ * global scope, so they are published with Object.assign at the end.
+ */
 import { FolderImportController } from "./runtime/controller";
 
 let controller: FolderImportController | undefined;
 
+/** Waits for Zotero to finish loading, then registers the menu and chrome. */
 async function startup({ id, rootURI }: { id: string; version: string; rootURI: string }): Promise<void> {
   await Zotero.initializationPromise;
   controller = new FolderImportController(id, rootURI);
@@ -9,6 +14,7 @@ async function startup({ id, rootURI }: { id: string; version: string; rootURI: 
   Zotero.debug("[Folder Import] started");
 }
 
+/** Tears down everything startup registered, so the plugin unloads cleanly. */
 function shutdown(): void {
   controller?.unregister();
   controller = undefined;

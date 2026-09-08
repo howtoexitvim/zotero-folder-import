@@ -57,6 +57,17 @@ describe("menu localization", () => {
   });
 });
 
+describe("menu visibility", () => {
+  it("hides the menu entry where an import cannot land", async () => {
+    const controller = await controllerSource;
+
+    // The entry used to show on My Publications, Duplicate Items, Unfiled
+    // Items and Trash, where the destination silently became the library root.
+    expect(controller).toContain("canImportHere");
+    expect(controller).toContain("menuElem.hidden = !this.canImportHere(window)");
+  });
+});
+
 describe("import progress", () => {
   it("opens the dialog non-modally", async () => {
     const controller = await controllerSource;

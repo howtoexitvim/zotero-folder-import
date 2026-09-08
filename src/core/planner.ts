@@ -1,8 +1,17 @@
+/**
+ * Turns a folder scan plus the current library contents into an import plan:
+ * which collections to create, and for each file whether it is new, already in
+ * the library, or clashes with an existing attachment. Pure -- it reads no
+ * Zotero state itself, so the whole preview is testable.
+ */
 import type { SourceFile } from "./scanner";
 
+/** What will happen to a file. "reused" means it is already in the library. */
 export type Classification = "new" | "reused" | "conflict" | "unsupported" | "error";
+/** How the user chose to resolve a same-name clash. */
 export type ConflictAction = "replace" | "ignore" | "keep-both" | "unresolved";
 
+/** A collection already present in the library. */
 export interface ExistingCollection {
   id: number;
   libraryID: number;
@@ -10,6 +19,7 @@ export interface ExistingCollection {
   name: string;
 }
 
+/** A stored-file attachment already in the library, used to spot duplicates. */
 export interface ExistingAttachment {
   id: number;
   parentID?: number | false;
@@ -20,11 +30,13 @@ export interface ExistingAttachment {
   hasAnnotations: boolean;
 }
 
+/** Where one file will be filed, and whether that collection exists yet. */
 export interface CollectionTarget {
   segments: string[];
   existingCollectionID?: number;
 }
 
+/** A scanned file plus the decision made about it. */
 export interface PlannedFile extends SourceFile {
   target: CollectionTarget;
   classification: Exclude<Classification, "unsupported" | "error">;
@@ -34,6 +46,7 @@ export interface PlannedFile extends SourceFile {
   sourceDuplicateOf?: string;
 }
 
+/** The complete preview: every file, the collections to create, and totals. */
 export interface ImportPlan {
   rootName: string;
   baseCollectionID?: number;
@@ -48,6 +61,7 @@ export interface ImportPlan {
   };
 }
 
+/** Everything buildImportPlan needs; supplied by the controller. */
 export interface BuildPlanInput {
   rootName: string;
   baseCollectionID?: number;
@@ -56,16 +70,23 @@ export interface BuildPlanInput {
   attachments: ExistingAttachment[];
 }
 
+/**
+ * Case- and Unicode-folded filename key. macOS stores decomposed filenames
+ * while other sources use composed ones, so the same file can differ byte-wise;
+ * comparing normalized keys keeps duplicate detection consistent.
+ */
 export function normalizeName(value: string): string {
   return value.normalize("NFC").toLocaleLowerCase("en-US");
 }
 
+/** Directory segments of a relative path, which become nested collections. */
 function relativeDirectory(relativePath: string): string[] {
   const parts = relativePath.split("/");
   parts.pop();
   return parts.filter(Boolean);
 }
 
+/** Maps a file's folder path to a collection, reusing one where it exists. */
 function resolveTarget(
   segments: string[],
   baseCollectionID: number | undefined,
@@ -89,6 +110,15 @@ function resolveTarget(
   return { segments, existingCollectionID: currentID };
 }
 
+/**
+ * Classifies every scanned file.
+ *
+ * A file whose size and MD5 match an existing attachment is "reused": Zotero
+ * items can live in several collections, so it is filed into the target rather
+ * than copied again. A file that only shares a filename with something already
+ * in the target collection is a "conflict" and needs the user to choose.
+ * Everything else is "new".
+ */
 export function buildImportPlan(input: BuildPlanInput): ImportPlan {
   const sourceContent = new Map<string, PlannedFile>();
   const claimedExistingAttachments = new Set<number>();

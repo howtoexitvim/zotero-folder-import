@@ -1,13 +1,19 @@
+/**
+ * Executes a confirmed import plan against the library. All Zotero access goes
+ * through ImportPort so the sequencing can be tested with a fake.
+ */
 import { allConflictsResolved, makeUniqueName } from "./conflicts";
 import { normalizeName, type ImportPlan, type PlannedFile } from "./planner";
 import type { FileStat } from "./scanner";
 
+/** State of an existing attachment, re-checked before a destructive Replace. */
 export interface AttachmentContext {
   id: number;
   parentID?: number | false;
   hasAnnotations: boolean;
 }
 
+/** One file to copy into Zotero storage. */
 export interface ImportStoredRequest {
   path: string;
   name: string;
@@ -15,6 +21,7 @@ export interface ImportStoredRequest {
   parentItemID?: number;
 }
 
+/** Library operations the importer needs; backed by Zotero at runtime. */
 export interface ImportPort {
   stat(path: string): Promise<FileStat>;
   ensureCollection(baseCollectionID: number | undefined, segments: string[]): Promise<number>;
@@ -30,11 +37,13 @@ export interface ImportPort {
   indexAttachments(ids: number[]): Promise<void>;
 }
 
+/** One file that could not be imported. */
 export interface ImportFailure {
   path: string;
   message: string;
 }
 
+/** Tally of what happened, shown when the import finishes. */
 export interface ImportResult {
   imported: number;
   reused: number;
@@ -46,6 +55,7 @@ export interface ImportResult {
   errors: ImportFailure[];
 }
 
+/** Per-file progress pushed to the dialog. */
 export interface ImportProgress {
   completed: number;
   total: number;
@@ -53,6 +63,7 @@ export interface ImportProgress {
   result: ImportResult;
 }
 
+/** Zeroed tally to accumulate into. */
 function emptyResult(): ImportResult {
   return {
     imported: 0,
@@ -66,12 +77,18 @@ function emptyResult(): ImportResult {
   };
 }
 
+/** Refuses to start while any conflict is still undecided. */
 function assertResolved(plan: ImportPlan): void {
   if (!allConflictsResolved(plan.files)) {
     throw new Error("Import plan contains an unresolved conflict");
   }
 }
 
+/**
+ * Re-stats a file before importing it. The preview may be minutes old, and
+ * importing a file that changed since then would store something the user never
+ * reviewed.
+ */
 async function ensureUnchanged(file: PlannedFile, port: ImportPort): Promise<void> {
   const current = await port.stat(file.absolutePath);
   if (current.size !== file.size || current.mtime !== file.mtime) {
@@ -79,6 +96,14 @@ async function ensureUnchanged(file: PlannedFile, port: ImportPort): Promise<voi
   }
 }
 
+/**
+ * Imports every file in the plan, continuing past individual failures so one
+ * bad file cannot abort the run; failures are collected into the result.
+ *
+ * Replace is deliberately ordered import-then-trash: the new attachment must
+ * exist before the old one is moved to the trash, so a failure never leaves the
+ * user with neither copy.
+ */
 export async function executeImport(
   plan: ImportPlan,
   port: ImportPort,

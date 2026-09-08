@@ -1,7 +1,17 @@
+/**
+ * The preview dialog's page script.
+ *
+ * The dialog is a XUL document, which constrains everything here: elements are
+ * built in the XUL namespace, <label> shows its "value" attribute rather than
+ * text content, visibility is the hidden="true" attribute, and buttons fire
+ * "command" rather than "click". Text is set from the words table below because
+ * a plugin's Fluent bundle does not resolve in this window.
+ */
 import { allConflictsResolved, applyConflictChoice } from "./core/conflicts";
 import type { ImportProgress, ImportResult } from "./core/importer";
 import type { ConflictAction, ImportPlan, PlannedFile } from "./core/planner";
 
+/** Everything the controller hands the dialog through window.arguments. */
 interface DialogData {
   locale: string;
   sourcePath: string;
@@ -15,6 +25,7 @@ interface DialogData {
   ): Promise<ImportResult>;
 }
 
+/** Reads the argument object, accepting both wrapped and bare forms. */
 function readDialogData(): DialogData {
   const argument = (window as any).arguments?.[0];
   if (!argument) throw new Error("Folder Import dialog was opened without data");
@@ -30,6 +41,7 @@ let files: PlannedFile[] = [];
 let zh = false;
 let words: Record<string, string>;
 
+/** Fills the UI string table for the active locale. */
 function initWords(): void {
   words = zh
     ? {
@@ -104,16 +116,12 @@ function initWords(): void {
     };
 }
 
+/** Only used by reportFatal, which needs real HTML for its error panel. */
 const HTML_NS = "http://www.w3.org/1999/xhtml";
-
-// The dialog root is a XUL <window>, so document.createElement() would build
-// XUL elements. Everything we build at runtime is HTML.
-function html<T extends HTMLElement>(tag: string): T {
-  return document.createElementNS(HTML_NS, tag) as unknown as T;
-}
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
+/** Creates a XUL element; the dialog's own widgets live in this namespace. */
 function xul(tag: string): Element {
   return document.createElementNS(XUL_NS, tag);
 }
@@ -135,6 +143,7 @@ function byId<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+/** Human-readable file size, e.g. "1.89 MB". */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB", "TB"];
@@ -182,6 +191,7 @@ function appendListItem(list: Element, text: string): void {
   list.append(item);
 }
 
+/** Paints the static labels, paths, counts and collection list. */
 function renderSummary(): void {
   setPath(byId("source-path"), data.sourcePath);
   setPath(byId("destination-path"), data.destinationPath);
@@ -238,6 +248,10 @@ function renderSummary(): void {
   }
 }
 
+/**
+ * Rebuilds the file table. Called again after each conflict choice, which is
+ * why the conflict menulists are recreated rather than mutated.
+ */
 function renderFiles(): void {
   const body = byId("file-table-body");
   const anyConflicts = files.some((file) => file.classification === "conflict");
@@ -303,6 +317,7 @@ function renderFiles(): void {
   });
 }
 
+/** Import stays disabled until every conflict has a decision. */
 function updateImportButton(): void {
   const disabled = !files.length || !allConflictsResolved(files);
   const button = byId("import-button");
@@ -310,6 +325,7 @@ function updateImportButton(): void {
   else button.removeAttribute("disabled");
 }
 
+/** Swaps the preview for the progress view once the import starts. */
 function showProgress(): void {
   setHidden(byId("preview-view"), true);
   setHidden(byId("progress-view"), false);
@@ -317,6 +333,7 @@ function showProgress(): void {
   setHidden(byId("import-button"), true);
 }
 
+/** Advances the progress bar; called once per file by the importer. */
 function updateProgress(progress: ImportProgress): void {
   const meter = byId<HTMLProgressElement>("progress-meter");
   meter.max = progress.total;
@@ -324,6 +341,7 @@ function updateProgress(progress: ImportProgress): void {
   setText(byId("progress-label"), `${progress.completed} / ${progress.total} — ${progress.path}`);
 }
 
+/** Shows the final tally and any per-file errors. */
 function renderResult(result: ImportResult): void {
   setText(byId("progress-title"), words.done);
   setText(byId("result-summary"), [
@@ -342,6 +360,7 @@ function renderResult(result: ImportResult): void {
   setHidden(byId("close-button"), false);
 }
 
+/** Runs the import and renders the outcome, including on failure. */
 async function beginImport(): Promise<void> {
   if (!allConflictsResolved(files)) return;
   showProgress();
@@ -383,6 +402,7 @@ function reportFatal(error: unknown): void {
   root.replaceChildren(pre, close);
 }
 
+/** Builds the whole preview from the handed-over plan. */
 function render(): void {
   try {
     data = readDialogData();
@@ -400,6 +420,7 @@ function render(): void {
   }
 }
 
+/** Entry point called from the window's onload attribute. */
 function init(): void {
   // onload can fire before the parser has finished building the window's
   // children, in which case getElementById finds nothing. Wait for the last

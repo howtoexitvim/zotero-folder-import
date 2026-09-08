@@ -1,4 +1,4 @@
-import { resolveDestination, type SelectedRow } from "../core/destination";
+import { canImportInto, resolveDestination, type SelectedRow } from "../core/destination";
 import { executeImport, type ImportProgress } from "../core/importer";
 import { buildImportPlan, type ConflictAction, type ImportPlan } from "../core/planner";
 import { scanFolder } from "../core/scanner";
@@ -10,10 +10,17 @@ import {
   ZoteroImportPort,
 } from "./zotero-port";
 
+/**
+ * Wires the plugin into Zotero: the File menu entry, the chrome package the
+ * dialog is served from, and the scan -> preview -> import sequence.
+ */
+
+/** Conflict resolutions chosen in the preview dialog, keyed by relative path. */
 interface DialogActions {
   [relativePath: string]: ConflictAction;
 }
 
+/** Builds "Parent / Child" for a collection, walking up to the library root. */
 function collectionPath(collection: any): string {
   const parts: string[] = [];
   let current = collection;
@@ -36,10 +43,12 @@ function selectedRows(window: any): SelectedRow[] {
   }));
 }
 
+/** Trailing folder name of a path, used as the top collection to create. */
 function rootName(path: string): string {
   return PathUtils.filename(path.replace(/[\\/]+$/, ""));
 }
 
+/** Applies the dialog's conflict choices onto the plan before importing. */
 function resolvedPlan(plan: ImportPlan, actions: DialogActions): ImportPlan {
   return {
     ...plan,
@@ -49,8 +58,14 @@ function resolvedPlan(plan: ImportPlan, actions: DialogActions): ImportPlan {
   };
 }
 
+/** Chrome package name registered at startup; dialogs load through it. */
 const CHROME_PACKAGE = "folder-import";
 
+/**
+ * Zotero never loads a plugin's own Fluent files for menus -- the code that
+ * would do it is commented out in menuManager.js -- so an l10nID resolves to
+ * nothing and renders a blank row. Labels are set directly instead.
+ */
 function menuLabel(): string {
   const locale = String(Zotero.locale ?? "en-US").toLowerCase();
   return locale.startsWith("zh") ? "导入文件夹…" : "Import Folder…";
@@ -79,6 +94,7 @@ export class FolderImportController {
     ]);
   }
 
+  /** Registers the chrome package and the File menu entry. */
   register(): void {
     this.registerChrome();
     const menuID = Zotero.MenuManager.registerMenu({
@@ -88,12 +104,16 @@ export class FolderImportController {
       menus: [{
         menuType: "menuitem",
         enableForTabTypes: ["library"],
-        // Zotero never loads a plugin's own Fluent files for menus -- the code
-        // that would do it is commented out in menuManager.js -- so an l10nID
-        // here resolves to nothing and the item renders as a blank but
-        // selectable row. Set the label directly instead, as working plugins do.
-        onShowing: (_event: any, context: any) => {
-          context?.menuElem?.setAttribute("label", menuLabel());
+        onShowing: (event: any, context: any) => {
+          const menuElem = context?.menuElem;
+          if (!menuElem) return;
+          menuElem.setAttribute("label", menuLabel());
+          // Only My Library and real collections can receive files. Views like
+          // My Publications, Duplicate Items, Unfiled Items and Trash list
+          // existing items and are not import targets, so hide the entry there
+          // rather than silently falling back to the library root.
+          const window = event?.target?.ownerGlobal ?? menuElem.ownerGlobal;
+          menuElem.hidden = !this.canImportHere(window);
         },
         onCommand: (event: any) => {
           const window = event.target.ownerGlobal;
@@ -108,6 +128,18 @@ export class FolderImportController {
     this.registeredMenuID = menuID;
   }
 
+  /** True when the current collections-pane selection can receive an import. */
+  private canImportHere(window: any): boolean {
+    try {
+      const rows = selectedRows(window);
+      return rows.length === 1 && canImportInto(rows[0], Zotero.Libraries.userLibraryID);
+    } catch (error) {
+      Zotero.debug(`[Folder Import] selection check failed: ${error}`);
+      return false;
+    }
+  }
+
+  /** Removes the menu entry and releases the chrome registration. */
   unregister(): void {
     if (this.registeredMenuID) Zotero.MenuManager.unregisterMenu(this.registeredMenuID);
     this.registeredMenuID = undefined;
@@ -115,6 +147,7 @@ export class FolderImportController {
     this.chromeHandle = undefined;
   }
 
+  /** Shows the folder picker; resolves undefined if the user cancels. */
   private async chooseFolder(window: any): Promise<string | undefined> {
     const { FilePicker } = ChromeUtils.importESModule("chrome://zotero/content/modules/filePicker.mjs");
     const picker = new FilePicker();
@@ -123,6 +156,10 @@ export class FolderImportController {
     return result === picker.returnOK ? picker.file : undefined;
   }
 
+  /**
+   * Scans the chosen folder, builds an import plan, and opens the preview
+   * dialog. Nothing is written to the library until the user confirms there.
+   */
   async run(window: any): Promise<void> {
     const destination = resolveDestination(
       selectedRows(window),
