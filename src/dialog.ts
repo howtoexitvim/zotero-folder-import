@@ -107,31 +107,38 @@ function setHidden(element: Element, hidden: boolean): void {
   else element.removeAttribute("hidden");
 }
 
-function appendCell(row: HTMLElement, text: string, className?: string): HTMLElement {
-  const cell = html<HTMLElement>("span");
-  cell.textContent = text;
+// XUL <label> renders its value attribute, not textContent.
+function setText(element: Element, text: string): void {
+  element.setAttribute("value", text);
+}
+
+function appendCell(row: Element, text: string, className?: string): Element {
+  const cell = xul("label");
+  cell.setAttribute("value", text);
+  cell.setAttribute("crop", "end");
   if (className) cell.setAttribute("class", className);
   row.append(cell);
   return cell;
 }
 
 function appendListItem(list: Element, text: string): void {
-  const item = html<HTMLElement>("div");
+  const item = xul("label");
   item.setAttribute("class", "list-item");
-  item.textContent = text;
+  item.setAttribute("value", text);
+  item.setAttribute("crop", "center");
   list.append(item);
 }
 
 function renderSummary(): void {
-  byId("source-path").textContent = data.sourcePath;
-  byId("destination-path").textContent = data.destinationPath;
-  byId("count-total").textContent = String(data.plan.summary.total);
-  byId("count-size").textContent = formatBytes(data.plan.summary.bytes);
-  byId("count-new").textContent = String(data.plan.summary.new);
-  byId("count-reused").textContent = String(data.plan.summary.reused);
-  byId("count-conflicts").textContent = String(data.plan.summary.conflict);
-  byId("count-unsupported").textContent = String(data.unsupportedCount);
-  byId("count-errors").textContent = String(data.scanErrors.length);
+  setText(byId("source-path"), data.sourcePath);
+  setText(byId("destination-path"), data.destinationPath);
+  setText(byId("count-total"), String(data.plan.summary.total));
+  setText(byId("count-size"), formatBytes(data.plan.summary.bytes));
+  setText(byId("count-new"), String(data.plan.summary.new));
+  setText(byId("count-reused"), String(data.plan.summary.reused));
+  setText(byId("count-conflicts"), String(data.plan.summary.conflict));
+  setText(byId("count-unsupported"), String(data.unsupportedCount));
+  setText(byId("count-errors"), String(data.scanErrors.length));
 
   setHidden(byId("scan-error-group"), data.scanErrors.length === 0);
   const scanErrorList = byId("scan-error-list");
@@ -154,27 +161,29 @@ function renderFiles(): void {
   const body = byId("file-table-body");
   body.replaceChildren();
   files.forEach((file, index) => {
-    const row = html<HTMLElement>("div");
+    const row = xul("hbox");
     row.setAttribute("class", "trow");
-    appendCell(row, file.relativePath, "file-path");
-    appendCell(row, file.extension.toUpperCase());
-    appendCell(row, formatBytes(file.size));
+    row.setAttribute("align", "center");
+    appendCell(row, file.relativePath, "col-file");
+    appendCell(row, file.extension.toUpperCase(), "col-type");
+    appendCell(row, formatBytes(file.size), "col-size");
     const status = file.classification === "new"
       ? words.new
       : file.classification === "reused"
         ? words.reused
         : words.conflict;
-    appendCell(row, status, `status status-${file.classification}`);
+    appendCell(row, status, `col-status status-${file.classification}`);
 
     if (file.classification !== "conflict") {
-      appendCell(row, "");
+      appendCell(row, "", "col-action");
       body.append(row);
       return;
     }
 
     // XUL menulist, not <select>: the XUL parser does not build HTML form
     // controls beyond input/textarea, so an <option> list never appears.
-    const actionCell = html<HTMLElement>("span");
+    const actionCell = xul("hbox");
+    actionCell.setAttribute("class", "col-action");
     const menulist = xul("menulist");
     menulist.setAttribute("native", "true");
     const popup = xul("menupopup");
@@ -229,19 +238,19 @@ function updateProgress(progress: ImportProgress): void {
   const meter = byId<HTMLProgressElement>("progress-meter");
   meter.max = progress.total;
   meter.value = progress.completed;
-  byId("progress-label").textContent = `${progress.completed} / ${progress.total} — ${progress.path}`;
+  setText(byId("progress-label"), `${progress.completed} / ${progress.total} — ${progress.path}`);
 }
 
 function renderResult(result: ImportResult): void {
-  byId("progress-title").textContent = words.done;
-  byId("result-summary").textContent = [
+  setText(byId("progress-title"), words.done);
+  setText(byId("result-summary"), [
     `${words.new}: ${result.imported}`,
     `${words.reused}: ${result.reused}`,
     `${words.replace}: ${result.replaced}`,
     `${words.keepBoth}: ${result.keptBoth}`,
     `${words.ignore}: ${result.ignored}`,
     `${words.failed}: ${result.failed}`,
-  ].join(" · ");
+  ].join(" · "));
   const errors = byId("result-errors");
   errors.replaceChildren();
   for (const error of result.errors) {

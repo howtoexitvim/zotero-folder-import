@@ -49,15 +49,12 @@ describe("Zotero install manifest", () => {
       "utf8",
     );
 
-    // Zotero's own dialogs only ever use div/span/input/label/h1/h2/p/a/
-    // progress/textarea/link inside XUL. Sectioning and table tags are never
-    // used; the XUL parser does not build them and silently drops everything
-    // nested inside, which is why getElementById returned null for elements
-    // that were plainly present in the markup.
-    const allowed = new Set([
-      "div", "span", "input", "label", "h1", "h2", "p", "a",
-      "progress", "textarea", "link",
-    ]);
+    // Mixing HTML into the XUL window body made the parser drop the whole
+    // subtree (documentElement reported children=0 with readyState=complete).
+    // The working reference plugin's dialog is pure XUL apart from the
+    // localization <link>, so keep html: usage down to that plus <progress>,
+    // which has no XUL equivalent.
+    const allowed = new Set(["link", "progress"]);
     const used = [...dialog.matchAll(/<html:([a-z0-9]+)/g)].map((m) => m[1]);
 
     expect([...new Set(used)].filter((tag) => !allowed.has(tag))).toEqual([]);
