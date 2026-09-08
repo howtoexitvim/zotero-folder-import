@@ -43,6 +43,26 @@ describe("Zotero install manifest", () => {
     expect(script).toContain("FolderImportDialog");
   });
 
+  it("only uses HTML tags the XUL parser actually builds", async () => {
+    const dialog = await readFile(
+      new URL("../addon/content/dialog.xhtml", import.meta.url),
+      "utf8",
+    );
+
+    // Zotero's own dialogs only ever use div/span/input/label/h1/h2/p/a/
+    // progress/textarea/link inside XUL. Sectioning and table tags are never
+    // used; the XUL parser does not build them and silently drops everything
+    // nested inside, which is why getElementById returned null for elements
+    // that were plainly present in the markup.
+    const allowed = new Set([
+      "div", "span", "input", "label", "h1", "h2", "p", "a",
+      "progress", "textarea", "link",
+    ]);
+    const used = [...dialog.matchAll(/<html:([a-z0-9]+)/g)].map((m) => m[1]);
+
+    expect([...new Set(used)].filter((tag) => !allowed.has(tag))).toEqual([]);
+  });
+
   it("creates runtime elements in the HTML namespace", async () => {
     const script = await readFile(
       new URL("../src/dialog.ts", import.meta.url),

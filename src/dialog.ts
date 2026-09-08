@@ -66,6 +66,12 @@ function html<T extends HTMLElement>(tag: string): T {
   return document.createElementNS(HTML_NS, tag) as unknown as T;
 }
 
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+
+function xul(tag: string): Element {
+  return document.createElementNS(XUL_NS, tag);
+}
+
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing dialog element ${id}`);
@@ -84,11 +90,25 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
 }
 
-function appendCell(row: HTMLTableRowElement, text: string, className?: string): HTMLTableCellElement {
-  const cell = row.insertCell();
+// XUL uses a hidden="true" attribute rather than the HTML hidden property.
+function setHidden(element: Element, hidden: boolean): void {
+  if (hidden) element.setAttribute("hidden", "true");
+  else element.removeAttribute("hidden");
+}
+
+function appendCell(row: HTMLElement, text: string, className?: string): HTMLElement {
+  const cell = html<HTMLElement>("span");
   cell.textContent = text;
-  if (className) cell.className = className;
+  if (className) cell.setAttribute("class", className);
+  row.append(cell);
   return cell;
+}
+
+function appendListItem(list: Element, text: string): void {
+  const item = html<HTMLElement>("div");
+  item.setAttribute("class", "list-item");
+  item.textContent = text;
+  list.append(item);
 }
 
 function renderSummary(): void {
@@ -102,35 +122,29 @@ function renderSummary(): void {
   byId("count-unsupported").textContent = String(data.unsupportedCount);
   byId("count-errors").textContent = String(data.scanErrors.length);
 
-  const scanErrorDetails = byId<HTMLDetailsElement>("scan-error-details");
-  scanErrorDetails.hidden = data.scanErrors.length === 0;
+  setHidden(byId("scan-error-group"), data.scanErrors.length === 0);
   const scanErrorList = byId("scan-error-list");
   scanErrorList.replaceChildren();
   for (const error of data.scanErrors) {
-    const item = html<HTMLLIElement>("li");
-    item.textContent = `${error.path}: ${error.message}`;
-    scanErrorList.append(item);
+    appendListItem(scanErrorList, `${error.path}: ${error.message}`);
   }
 
   const collections = byId("collection-list");
   collections.replaceChildren();
   for (const segments of data.plan.collectionsToCreate) {
-    const item = html<HTMLLIElement>("li");
-    item.textContent = segments.join(" / ");
-    collections.append(item);
+    appendListItem(collections, segments.join(" / "));
   }
   if (!data.plan.collectionsToCreate.length) {
-    const item = html<HTMLLIElement>("li");
-    item.textContent = zh ? "全部复用现有 collection" : "All collections already exist";
-    collections.append(item);
+    appendListItem(collections, zh ? "全部复用现有 collection" : "All collections already exist");
   }
 }
 
 function renderFiles(): void {
-  const body = byId<HTMLTableSectionElement>("file-table-body");
+  const body = byId("file-table-body");
   body.replaceChildren();
   files.forEach((file, index) => {
-    const row = body.insertRow();
+    const row = html<HTMLElement>("div");
+    row.setAttribute("class", "trow");
     appendCell(row, file.relativePath, "file-path");
     appendCell(row, file.extension.toUpperCase());
     appendCell(row, formatBytes(file.size));
@@ -140,11 +154,19 @@ function renderFiles(): void {
         ? words.reused
         : words.conflict;
     appendCell(row, status, `status status-${file.classification}`);
-    const actionCell = row.insertCell();
-    if (file.classification !== "conflict") return;
 
-    const select = html<HTMLSelectElement>("select");
-    select.dataset.index = String(index);
+    if (file.classification !== "conflict") {
+      appendCell(row, "");
+      body.append(row);
+      return;
+    }
+
+    // XUL menulist, not <select>: the XUL parser does not build HTML form
+    // controls beyond input/textarea, so an <option> list never appears.
+    const actionCell = html<HTMLElement>("span");
+    const menulist = xul("menulist");
+    menulist.setAttribute("native", "true");
+    const popup = xul("menupopup");
     const options: Array<[ConflictAction, string, boolean]> = [
       ["unresolved", words.unresolved, false],
       ["replace", file.replaceAllowed ? words.replace : `${words.replace} — ${words.annotated}`, !file.replaceAllowed],
@@ -152,38 +174,44 @@ function renderFiles(): void {
       ["keep-both", words.keepBoth, false],
     ];
     for (const [value, label, disabled] of options) {
-      const option = html<HTMLOptionElement>("option");
-      option.value = value;
-      option.textContent = label;
-      option.disabled = disabled;
-      option.selected = file.conflictAction === value;
-      select.append(option);
+      const item = xul("menuitem");
+      item.setAttribute("value", value);
+      item.setAttribute("label", label);
+      if (disabled) item.setAttribute("disabled", "true");
+      popup.append(item);
     }
-    select.addEventListener("change", () => {
-      const action = select.value as ConflictAction;
+    menulist.append(popup);
+    menulist.setAttribute("value", file.conflictAction ?? "unresolved");
+    menulist.addEventListener("command", () => {
+      const action = (menulist as any).value as ConflictAction;
       if (action === "unresolved") return;
       files = applyConflictChoice(
         files,
         index,
         action,
-        byId<HTMLInputElement>("apply-all").checked,
+        (byId("apply-all") as any).checked,
       );
       renderFiles();
       updateImportButton();
     });
-    actionCell.append(select);
+    actionCell.append(menulist);
+    row.append(actionCell);
+    body.append(row);
   });
 }
 
 function updateImportButton(): void {
-  byId<HTMLButtonElement>("import-button").disabled = !files.length || !allConflictsResolved(files);
+  const disabled = !files.length || !allConflictsResolved(files);
+  const button = byId("import-button");
+  if (disabled) button.setAttribute("disabled", "true");
+  else button.removeAttribute("disabled");
 }
 
 function showProgress(): void {
-  byId("preview-view").hidden = true;
-  byId("progress-view").hidden = false;
-  byId("cancel-button").hidden = true;
-  byId("import-button").hidden = true;
+  setHidden(byId("preview-view"), true);
+  setHidden(byId("progress-view"), false);
+  setHidden(byId("cancel-button"), true);
+  setHidden(byId("import-button"), true);
 }
 
 function updateProgress(progress: ImportProgress): void {
@@ -206,11 +234,9 @@ function renderResult(result: ImportResult): void {
   const errors = byId("result-errors");
   errors.replaceChildren();
   for (const error of result.errors) {
-    const item = html<HTMLLIElement>("li");
-    item.textContent = `${error.path}: ${error.message}`;
-    errors.append(item);
+    appendListItem(errors, `${error.path}: ${error.message}`);
   }
-  byId<HTMLButtonElement>("close-button").hidden = false;
+  setHidden(byId("close-button"), false);
 }
 
 async function beginImport(): Promise<void> {
@@ -263,9 +289,9 @@ function init(): void {
     renderSummary();
     renderFiles();
     updateImportButton();
-    byId("cancel-button").addEventListener("click", () => window.close());
-    byId("close-button").addEventListener("click", () => window.close());
-    byId("import-button").addEventListener("click", () => void beginImport());
+    byId("cancel-button").addEventListener("command", () => window.close());
+    byId("close-button").addEventListener("command", () => window.close());
+    byId("import-button").addEventListener("command", () => void beginImport());
   } catch (error) {
     reportFatal(error);
   }

@@ -14,72 +14,77 @@
   </linkset>
   <script src="chrome://folder-import/content/dialog.js" />
 
+  <!--
+    Zotero's own dialogs only ever use html:div, html:span, html:input,
+    html:label, html:h1, html:p, html:a, html:progress and html:textarea
+    inside XUL. Sectioning and table tags (main/section/header/footer/details/
+    table/dl/ul/select) are never used and are not built by the XUL parser, so
+    anything nested inside them is silently dropped from the DOM. Everything
+    below sticks to the proven tag set; the file table is built from divs.
+  -->
   <vbox id="folder-import-root" flex="1">
-    <html:main>
-      <html:section id="preview-view">
-        <html:header>
-          <html:h1 data-l10n-id="folder-import-preview-title">Review import</html:h1>
-          <html:p data-l10n-id="folder-import-preview-description">Nothing is written until you confirm.</html:p>
-        </html:header>
+    <html:div id="scroll-area">
+      <html:div id="preview-view">
+        <html:h1 data-l10n-id="folder-import-preview-title">Review import</html:h1>
+        <html:p class="subtitle" data-l10n-id="folder-import-preview-description">Nothing is written until you confirm.</html:p>
 
-        <html:dl class="paths">
-          <html:dt data-l10n-id="folder-import-source">Source</html:dt><html:dd id="source-path"></html:dd>
-          <html:dt data-l10n-id="folder-import-destination">Destination</html:dt><html:dd id="destination-path"></html:dd>
-        </html:dl>
+        <html:div class="paths">
+          <html:span class="label" data-l10n-id="folder-import-source">Source</html:span>
+          <html:span id="source-path" class="value"></html:span>
+          <html:span class="label" data-l10n-id="folder-import-destination">Destination</html:span>
+          <html:span id="destination-path" class="value"></html:span>
+        </html:div>
 
         <html:div class="metrics">
-          <html:div><html:strong id="count-total">0</html:strong><html:span data-l10n-id="folder-import-files">files</html:span></html:div>
-          <html:div><html:strong id="count-size">0 B</html:strong><html:span data-l10n-id="folder-import-total-size">total size</html:span></html:div>
-          <html:div><html:strong id="count-new">0</html:strong><html:span data-l10n-id="folder-import-new">new</html:span></html:div>
-          <html:div><html:strong id="count-reused">0</html:strong><html:span data-l10n-id="folder-import-reused">reused</html:span></html:div>
-          <html:div><html:strong id="count-conflicts">0</html:strong><html:span data-l10n-id="folder-import-conflicts">conflicts</html:span></html:div>
-          <html:div><html:strong id="count-unsupported">0</html:strong><html:span data-l10n-id="folder-import-unsupported">unsupported</html:span></html:div>
-          <html:div><html:strong id="count-errors">0</html:strong><html:span data-l10n-id="folder-import-errors">errors</html:span></html:div>
+          <html:div class="metric"><html:span id="count-total" class="num">0</html:span><html:span data-l10n-id="folder-import-files">files</html:span></html:div>
+          <html:div class="metric"><html:span id="count-size" class="num">0 B</html:span><html:span data-l10n-id="folder-import-total-size">total size</html:span></html:div>
+          <html:div class="metric"><html:span id="count-new" class="num">0</html:span><html:span data-l10n-id="folder-import-new">new</html:span></html:div>
+          <html:div class="metric"><html:span id="count-reused" class="num">0</html:span><html:span data-l10n-id="folder-import-reused">reused</html:span></html:div>
+          <html:div class="metric"><html:span id="count-conflicts" class="num">0</html:span><html:span data-l10n-id="folder-import-conflicts">conflicts</html:span></html:div>
+          <html:div class="metric"><html:span id="count-unsupported" class="num">0</html:span><html:span data-l10n-id="folder-import-unsupported">unsupported</html:span></html:div>
+          <html:div class="metric"><html:span id="count-errors" class="num">0</html:span><html:span data-l10n-id="folder-import-errors">errors</html:span></html:div>
         </html:div>
 
-        <html:details>
-          <html:summary data-l10n-id="folder-import-collections-to-create">Collections to create</html:summary>
-          <html:ul id="collection-list"></html:ul>
-        </html:details>
+        <html:div class="group">
+          <html:span class="group-title" data-l10n-id="folder-import-collections-to-create">Collections to create</html:span>
+          <html:div id="collection-list" class="list"></html:div>
+        </html:div>
 
-        <html:details id="scan-error-details" hidden="hidden">
-          <html:summary data-l10n-id="folder-import-scan-errors">Files unavailable during scanning</html:summary>
-          <html:ul id="scan-error-list" class="errors"></html:ul>
-        </html:details>
+        <html:div id="scan-error-group" class="group" hidden="hidden">
+          <html:span class="group-title" data-l10n-id="folder-import-scan-errors">Files unavailable during scanning</html:span>
+          <html:div id="scan-error-list" class="list errors"></html:div>
+        </html:div>
 
         <html:div class="conflict-toolbar">
-          <html:label><html:input id="apply-all" type="checkbox" /> <html:span data-l10n-id="folder-import-apply-all">Apply this choice to all remaining conflicts</html:span></html:label>
+          <html:label><html:input id="apply-all" type="checkbox" /><html:span data-l10n-id="folder-import-apply-all">Apply this choice to all remaining conflicts</html:span></html:label>
         </html:div>
 
-        <html:div class="table-wrap">
-          <html:table>
-            <html:thead>
-              <html:tr>
-                <html:th data-l10n-id="folder-import-file">File</html:th>
-                <html:th data-l10n-id="folder-import-type">Type</html:th>
-                <html:th data-l10n-id="folder-import-size">Size</html:th>
-                <html:th data-l10n-id="folder-import-status">Status</html:th>
-                <html:th data-l10n-id="folder-import-action">Action</html:th>
-              </html:tr>
-            </html:thead>
-            <html:tbody id="file-table-body"></html:tbody>
-          </html:table>
+        <html:div class="table">
+          <html:div class="thead">
+            <html:span data-l10n-id="folder-import-file">File</html:span>
+            <html:span data-l10n-id="folder-import-type">Type</html:span>
+            <html:span data-l10n-id="folder-import-size">Size</html:span>
+            <html:span data-l10n-id="folder-import-status">Status</html:span>
+            <html:span data-l10n-id="folder-import-action">Action</html:span>
+          </html:div>
+          <html:div id="file-table-body" class="tbody"></html:div>
         </html:div>
-      </html:section>
+      </html:div>
 
-      <html:section id="progress-view" hidden="hidden">
+      <html:div id="progress-view" hidden="hidden">
         <html:h1 id="progress-title" data-l10n-id="folder-import-importing">Importing…</html:h1>
         <html:progress id="progress-meter" value="0" max="1"></html:progress>
         <html:p id="progress-label"></html:p>
         <html:p id="result-summary"></html:p>
-        <html:ul id="result-errors" class="errors"></html:ul>
-      </html:section>
-    </html:main>
+        <html:div id="result-errors" class="list errors"></html:div>
+      </html:div>
+    </html:div>
 
-    <html:footer>
-      <html:button id="cancel-button" data-l10n-id="folder-import-cancel">Cancel</html:button>
-      <html:button id="import-button" class="primary" data-l10n-id="folder-import-confirm">Import</html:button>
-      <html:button id="close-button" class="primary" hidden="hidden" data-l10n-id="folder-import-close">Close</html:button>
-    </html:footer>
+    <!-- XUL buttons fire "command", not "click". -->
+    <hbox id="footer" pack="end" align="center">
+      <button id="cancel-button" data-l10n-id="folder-import-cancel" label="Cancel" />
+      <button id="import-button" default="true" data-l10n-id="folder-import-confirm" label="Import" />
+      <button id="close-button" hidden="true" data-l10n-id="folder-import-close" label="Close" />
+    </hbox>
   </vbox>
 </window>
