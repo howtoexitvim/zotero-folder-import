@@ -49,15 +49,33 @@ function resolvedPlan(plan: ImportPlan, actions: DialogActions): ImportPlan {
   };
 }
 
+const CHROME_PACKAGE = "folder-import";
+
 export class FolderImportController {
   private registeredMenuID?: string;
+  private chromeHandle?: { destruct(): void };
 
   constructor(
     private readonly pluginID: string,
     private readonly rootURI: string,
   ) {}
 
+  /**
+   * An installed XPI's rootURI is a jar: URL, and a dialog opened from one
+   * renders as an empty window -- its stylesheet and script never load. Zotero
+   * plugins therefore register a chrome:// package and open dialogs from that.
+   */
+  private registerChrome(): void {
+    const aomStartup = Components.classes["@mozilla.org/addons/addon-manager-startup;1"]
+      .getService(Components.interfaces.amIAddonManagerStartup);
+    const manifestURI = Services.io.newURI(`${this.rootURI}manifest.json`);
+    this.chromeHandle = aomStartup.registerChrome(manifestURI, [
+      ["content", CHROME_PACKAGE, "content/"],
+    ]);
+  }
+
   register(): void {
+    this.registerChrome();
     const menuID = Zotero.MenuManager.registerMenu({
       menuID: "folder-import-main-file-menu",
       pluginID: this.pluginID,
@@ -82,6 +100,8 @@ export class FolderImportController {
   unregister(): void {
     if (this.registeredMenuID) Zotero.MenuManager.unregisterMenu(this.registeredMenuID);
     this.registeredMenuID = undefined;
+    this.chromeHandle?.destruct();
+    this.chromeHandle = undefined;
   }
 
   private async chooseFolder(window: any): Promise<string | undefined> {
@@ -142,7 +162,7 @@ export class FolderImportController {
     // own fields are empty.
     dialogData.wrappedJSObject = dialogData;
     window.openDialog(
-      `${this.rootURI}content/dialog.xhtml`,
+      `chrome://${CHROME_PACKAGE}/content/dialog.xhtml`,
       "folder-import-dialog",
       "chrome,centerscreen,resizable,modal,width=1000,height=760",
       dialogData,
