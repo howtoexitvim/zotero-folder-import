@@ -335,25 +335,35 @@ function showProgress(): void {
   setHidden(byId("progress-view"), false);
   setHidden(byId("cancel-button"), true);
   setHidden(byId("import-button"), true);
-  resizeToContent(360);
+  // Let the panel shrink to its content instead of filling the preview's height.
+  byId("scroll-area").removeAttribute("flex");
+  resizeToContent();
 }
 
 /**
- * Resizes the window to its content height, clamped so it neither collapses nor
- * grows past the screen. XUL sizes to content only at load, so this is done by
- * hand whenever the visible panel changes.
+ * Shrinks the window to the height its content actually needs.
+ *
+ * XUL only sizes to content at load, so switching panels leaves the window at
+ * the preview's height with the progress view stranded in empty space. Measured
+ * from the laid-out root rather than a guessed constant, so the error list
+ * grows the window and a clean result stays compact.
  */
-function resizeToContent(preferredHeight: number): void {
-  try {
-    const width = window.outerWidth;
-    const height = Math.min(
-      Math.max(preferredHeight, 240),
-      window.screen?.availHeight ?? preferredHeight,
-    );
-    window.resizeTo(width, height);
-  } catch {
-    // Resizing is cosmetic; a window manager refusing it must not break the run.
-  }
+function resizeToContent(): void {
+  // Measure on the next frame so the panel swap has been laid out.
+  window.requestAnimationFrame(() => {
+    try {
+      const root = byId("folder-import-root");
+      const content = root.getBoundingClientRect().height;
+      const chrome = window.outerHeight - window.innerHeight;
+      const height = Math.min(
+        Math.max(Math.ceil(content + chrome), 220),
+        window.screen?.availHeight ?? 800,
+      );
+      window.resizeTo(window.outerWidth, height);
+    } catch {
+      // Resizing is cosmetic; a window manager refusing it must not break the run.
+    }
+  });
 }
 
 /** Advances the progress bar; called once per file by the importer. */
@@ -381,8 +391,7 @@ function renderResult(result: ImportResult): void {
     appendListItem(errors, `${error.path}: ${error.message}`);
   }
   setHidden(byId("close-button"), false);
-  // Give error lists room; a clean run stays compact.
-  resizeToContent(result.errors.length ? Math.min(360 + result.errors.length * 22, 640) : 300);
+  resizeToContent();
 }
 
 /** Runs the import and renders the outcome, including on failure. */
@@ -437,6 +446,7 @@ function render(): void {
     renderSummary();
     renderFiles();
     updateImportButton();
+    resizeToContent();
     byId("cancel-button").addEventListener("command", () => window.close());
     byId("close-button").addEventListener("command", () => window.close());
     byId("import-button").addEventListener("command", () => void beginImport());

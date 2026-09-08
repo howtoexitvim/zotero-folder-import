@@ -1,3 +1,12 @@
+/*
+ * Styling for the Folder Import dialog.
+ *
+ * XUL box layout does the arranging, so this file sticks to spacing, type and
+ * colour. Both views (preview and progress) share the same rhythm: a 24px
+ * gutter, a 20px heading, 13px secondary text, and GrayText for anything the
+ * user does not need to read closely.
+ */
+
 :root {
   color-scheme: light dark;
   font: message-box;
@@ -7,83 +16,100 @@
 
 * { box-sizing: border-box; }
 
-/* XUL document: there is no <body>; the vbox root fills the window. */
-/* XUL box layout handles sizing; keep CSS to spacing and colour only. */
-#folder-import-root { min-width: 760px; min-height: 560px; }
+/*
+ * Only a minimum width is set. A minimum height would floor the window and stop
+ * the progress view from shrinking to fit its handful of lines.
+ */
+#folder-import-root { min-width: 720px; }
 
-#scroll-area { padding: 24px; overflow: auto; }
-.heading { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
-.subtitle { color: GrayText; margin-bottom: 12px; }
+#scroll-area { padding: 24px 24px 20px; overflow: auto; }
 
-.paths { margin: 14px 0; }
-.path-row { margin-bottom: 4px; }
-/* Fixed-width caption so both paths start at the same x, and the value takes
-   the rest of the row and crops rather than widening the window. */
-.path-label { font-weight: 600; width: 92px; }
-.path-value { color: FieldText; }
+/* ---- shared type scale ---- */
 
+.heading { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
+.group-title { font-weight: 600; margin-bottom: 6px; }
+.muted { color: GrayText; }
 
+/* ---- source / destination ---- */
 
-.metrics { margin: 16px 0; }
+.paths { margin-bottom: 18px; }
+.path-row { margin-bottom: 5px; }
+/* Fixed-width caption so both values start at the same x; the value takes the
+   rest of the row and crops rather than widening the window. */
+.path-label { font-weight: 600; width: 96px; }
+
+/* ---- summary tiles ---- */
+
+.metrics { margin-bottom: 18px; }
 
 .metric {
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
   border-radius: 8px;
-  padding: 10px;
+  padding: 9px 12px;
   margin-right: 8px;
   min-width: 92px;
 }
 
-.metric .num { font-size: 17px; font-weight: 600; }
+.metric .num { font-size: 17px; font-weight: 600; margin-bottom: 2px; }
 .metric label:not(.num) { color: GrayText; font-size: 12px; }
 
-.group { margin: 12px 0; }
-.group-title { font-weight: 600; display: block; margin-bottom: 6px; }
+/* ---- collection / error lists ---- */
+
+.group { margin-bottom: 16px; }
 .list-item { padding: 1px 0; }
-#conflict-toolbar { margin: 14px 0; }
-#conflict-hint { font-weight: 400; color: GrayText; margin-bottom: 6px; }
+.errors { color: #cf222e; overflow-wrap: anywhere; }
+
+#conflict-toolbar { margin-bottom: 16px; }
+#conflict-hint { font-weight: 400; color: GrayText; margin-bottom: 8px; }
+
+/* ---- file table ---- */
 
 .table {
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
   border-radius: 8px;
-  max-height: 340px;
+  max-height: 320px;
 }
 
 .thead, .trow {
-  padding: 6px 10px;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  padding: 7px 12px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
 }
 
-.thead { font-weight: 600; padding-top: 10px; }
+.thead { font-weight: 600; color: GrayText; font-size: 12px; }
 .col-file   { flex: 1; min-width: 240px; }
-.col-size   { width: 100px; }
-.col-status { width: 110px; }
-.col-action { width: 230px; }
+.col-size   { width: 96px; }
+.col-status { width: 130px; }
+.col-action { width: 220px; }
+
 .status-new { color: #1a7f37; }
 .status-reused { color: #0969da; }
 .status-conflict { color: #9a6700; }
-menulist { max-width: 220px; }
+
+menulist { max-width: 210px; }
 checkbox { margin: 0; }
 
-progress { width: 100%; height: 6px; margin: 18px 0 0; border: none; }
-.progress-line { margin-top: 10px; }
+/* ---- progress view ---- */
+
+progress {
+  width: 100%;
+  height: 6px;
+  margin: 2px 0 0;
+  border: none;
+}
+
+.progress-line { margin-top: 12px; }
 #result-summary { color: GrayText; }
-/* The progress panel is a handful of lines; without this it inherits the
-   preview's height and leaves most of the window empty. */
-#progress-view { padding-bottom: 8px; }
-.errors { color: #cf222e; overflow-wrap: anywhere; }
+
+/* ---- footer ---- */
 
 #footer {
-  gap: 8px;
-  padding: 12px 18px;
-  border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  padding: 12px 24px;
+  border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 #footer button { min-width: 92px; margin-left: 8px; }
 
-@media (max-width: 900px) {
-  .metrics { grid-template-columns: repeat(4, 1fr); }
-}
+/* ---- setup failure panel ---- */
 
 .fatal {
   margin: 24px;
