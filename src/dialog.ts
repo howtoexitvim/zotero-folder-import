@@ -22,6 +22,7 @@ interface DialogData {
   onConfirm(
     actions: Record<string, ConflictAction>,
     onProgress: (progress: ImportProgress) => void,
+    shouldCancel?: () => boolean,
   ): Promise<ImportResult>;
 }
 
@@ -38,6 +39,10 @@ function readDialogData(): DialogData {
 
 let data: DialogData;
 let files: PlannedFile[] = [];
+/** Set when the user stops a running import; polled between files. */
+let cancelRequested = false;
+/** True while the import loop is running, which changes what Cancel does. */
+let importing = false;
 let zh = false;
 let words: Record<string, string>;
 
@@ -76,6 +81,9 @@ function initWords(): void {
       allExist: "全部使用现有 collection",
       importing: "正在导入…",
       cancel: "取消",
+      stop: "停止导入",
+      stopping: "正在停止…",
+      cancelled: "已取消导入",
       confirm: "导入",
       close: "关闭",
     }
@@ -111,6 +119,9 @@ function initWords(): void {
       allExist: "All collections already exist",
       importing: "Importing…",
       cancel: "Cancel",
+      stop: "Stop import",
+      stopping: "Stopping…",
+      cancelled: "Import cancelled",
       confirm: "Import",
       close: "Close",
     };
@@ -333,8 +344,12 @@ function updateImportButton(): void {
 function showProgress(): void {
   setHidden(byId("preview-view"), true);
   setHidden(byId("progress-view"), false);
-  setHidden(byId("cancel-button"), true);
   setHidden(byId("import-button"), true);
+  // The Cancel button becomes Stop: a long import needs a way out, and closing
+  // the window no longer stops anything now that the dialog is not modal.
+  const stopButton = byId("cancel-button");
+  stopButton.setAttribute("label", words.stop);
+  stopButton.removeAttribute("disabled");
   // Let the panel shrink to its content instead of filling the preview's height.
   byId("scroll-area").removeAttribute("flex");
   resizeToContent();
@@ -376,7 +391,8 @@ function updateProgress(progress: ImportProgress): void {
 
 /** Shows the final tally and any per-file errors. */
 function renderResult(result: ImportResult): void {
-  setText(byId("progress-title"), words.done);
+  setText(byId("progress-title"), result.cancelled ? words.cancelled : words.done);
+  setHidden(byId("cancel-button"), true);
   setText(byId("result-summary"), [
     `${words.new}: ${result.imported}`,
     `${words.reused}: ${result.reused}`,
@@ -397,6 +413,7 @@ function renderResult(result: ImportResult): void {
 /** Runs the import and renders the outcome, including on failure. */
 async function beginImport(): Promise<void> {
   if (!allConflictsResolved(files)) return;
+  importing = true;
   showProgress();
   const actions = Object.fromEntries(
     files
@@ -404,9 +421,11 @@ async function beginImport(): Promise<void> {
       .map((file) => [file.relativePath, file.conflictAction!]),
   );
   try {
-    const result = await data.onConfirm(actions, updateProgress);
+    const result = await data.onConfirm(actions, updateProgress, () => cancelRequested);
+    importing = false;
     renderResult(result);
   } catch (error) {
+    importing = false;
     renderResult({
       imported: 0,
       reused: 0,
@@ -447,7 +466,16 @@ function render(): void {
     renderFiles();
     updateImportButton();
     resizeToContent();
-    byId("cancel-button").addEventListener("command", () => window.close());
+    byId("cancel-button").addEventListener("command", () => {
+      if (!importing) {
+        window.close();
+        return;
+      }
+      cancelRequested = true;
+      const button = byId("cancel-button");
+      button.setAttribute("label", words.stopping);
+      button.setAttribute("disabled", "true");
+    });
     byId("close-button").addEventListener("command", () => window.close());
     byId("import-button").addEventListener("command", () => void beginImport());
   } catch (error) {

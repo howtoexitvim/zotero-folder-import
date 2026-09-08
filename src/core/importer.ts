@@ -45,6 +45,8 @@ export interface ImportFailure {
 
 /** Tally of what happened, shown when the import finishes. */
 export interface ImportResult {
+  /** True when the user stopped the run before every file was processed. */
+  cancelled?: boolean;
   imported: number;
   reused: number;
   ignored: number;
@@ -108,12 +110,19 @@ export async function executeImport(
   plan: ImportPlan,
   port: ImportPort,
   onProgress?: (progress: ImportProgress) => void,
+  shouldCancel?: () => boolean,
 ): Promise<ImportResult> {
   assertResolved(plan);
   const result = emptyResult();
   const contentAttachments = new Map<string, number>();
 
   for (let index = 0; index < plan.files.length; index += 1) {
+    // Checked between files rather than mid-file, so a cancel never leaves an
+    // attachment half-imported: whatever finished is kept, the rest is skipped.
+    if (shouldCancel?.()) {
+      result.cancelled = true;
+      break;
+    }
     const file = plan.files[index];
     try {
       if (file.classification === "conflict" && file.conflictAction === "ignore") {

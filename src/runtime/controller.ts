@@ -245,7 +245,8 @@ export class FolderImportController {
       onConfirm: async (
         actions: DialogActions,
         onProgress: (progress: ImportProgress) => void,
-      ) => executeImport(resolvedPlan(plan, actions), port, onProgress),
+        shouldCancel?: () => boolean,
+      ) => executeImport(resolvedPlan(plan, actions), port, onProgress, shouldCancel),
     };
     // Zotero's own dialogs self-reference here (see fileInterface.js) so that
     // both `arg` and `arg.wrappedJSObject` resolve to the same object. Passing

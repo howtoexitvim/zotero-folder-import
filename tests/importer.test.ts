@@ -237,3 +237,41 @@ describe("executeImport", () => {
     expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(2);
   });
 });
+
+describe("cancellation", () => {
+  function threeFiles() {
+    return plan(["a.pdf", "b.pdf", "c.pdf"].map((name) => planned({
+      absolutePath: `/source/${name}`,
+      relativePath: name,
+      name,
+      md5: name,
+    })));
+  }
+
+  it("keeps finished work, skips the rest, and reports the run as cancelled", async () => {
+    const { port, events } = fakePort();
+    let processed = 0;
+
+    const result = await executeImport(
+      threeFiles(),
+      port,
+      () => { processed += 1; },
+      () => processed >= 2,
+    );
+
+    // Cancel is checked between files, so nothing is left half-imported.
+    expect(result.cancelled).toBe(true);
+    expect(result.imported).toBe(2);
+    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(2);
+  });
+
+  it("does not mark a completed run as cancelled", async () => {
+    const { port, events } = fakePort();
+
+    const result = await executeImport(threeFiles(), port, undefined, () => false);
+
+    expect(result.cancelled).toBeFalsy();
+    expect(result.imported).toBe(3);
+    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(3);
+  });
+});

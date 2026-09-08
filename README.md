@@ -49,9 +49,20 @@ Zotero 的 item 可以同时属于多个 collection,所以 "already in library" 
 
 | 优先级 | 问题 | 现状 | 更优雅的方案 |
 | --- | --- | --- | --- |
-| **P1** | 导入无法取消 | 循环一旦开始就跑到底;进度界面只有关闭按钮,关掉窗口后导入仍在后台继续(非 modal 之后更明显) | 加真正的 Cancel:置标志位,循环每轮检查;已导入的保留,未导入的停下,结果页汇报"已取消,完成 N/M" |
-| **P2** | "Already in library" 无法选择独立副本 | 只要库中任何位置有同内容文件就复用同一个 item。想在新位置单独加标注做不到 —— 标注、笔记、删除全部联动 | 在预览界面给这类行一个可切换动作:「加入此 collection(默认)」/「新建独立副本」。不弹窗、不打断,只是一个可选项 |
-| **P3** | MD5 匹配要遍历全库 | `getExistingAttachments()` 拉取全库附件,对 size 匹配的算 MD5。已复用 `attachmentSyncedHash` 并每 25 条让出主线程,但仍是 O(库大小) | 走 `Zotero.DB` 直接 SQL,在数据库层按 size 过滤,只把候选拉进内存。几百个文件时无感,几千个时才值得改 —— 现在动属于过早优化 |
+| ~~P1~~ | ~~导入无法取消~~ | **已完成 (0.1.17)**:导入中 Cancel 变为「停止导入」,循环每轮检查标志位。已导入的保留,未导入的跳过,结果页标记为「已取消导入」 | — |
+| **P1** | "Already in library" 强制共享 item | 只要库中任何位置有同内容文件就复用同一个 item,标注/笔记/删除全部联动。**这是本插件的设计选择,不是 Zotero 限制** —— 见下方「为什么 MD5 匹配是可选的」 | 改为 Finder 心智:只在**目标 collection 内按文件名**判重,不重名就独立导入。MD5 降级为可选提示(「库中已有,可改为引用」),默认独立。顺带消除下面的 P2 |
+| **P2** | MD5 匹配要遍历全库 | `getExistingAttachments()` 拉取全库附件,对 size 匹配的算 MD5。已复用 `attachmentSyncedHash` 并每 25 条让出主线程,但仍是 O(库大小) | 若采纳上面的方案则**自然消失**(只查目标 collection,O(collection))。若保留 MD5 匹配,则走 `Zotero.DB` 在 SQL 层按 size 过滤 |
+
+### 为什么 MD5 匹配是可选的
+
+一度以为「Zotero 底层按 MD5 认文件,所以必须匹配,否则 Cmd+Delete 会误删另一份」。**查证后确认这是错的**:
+
+- attachment 的存储目录按**随机 item key** 分(`attachments.js:2773` → `dataObject.js:1585` → `randomString(8)`),与内容无关。两个同内容 PDF 存在两个独立目录,各一份物理副本。
+- `importFromFile` 里**没有任何 hash 去重逻辑**。
+- Duplicate Items 视图按 **ISBN / DOI / 标题+作者** 匹配(`duplicates.js:194-276`),不按 MD5。
+- MD5(`attachmentSyncedHash`)**只用于 storage sync**(`storageLocal.js` / `webdav.js` / `zfs.js`),判断云端与本地是否需要重传,与删除、去重无关。
+
+结论:独立副本之间**互不影响**,删一个不会动另一个。当前的联动删除完全来自本插件的 `linkExisting()` 复用同一 item,是可以改的。
 
 ## Compatibility and privacy
 
