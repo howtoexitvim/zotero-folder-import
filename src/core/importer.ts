@@ -1,5 +1,5 @@
 import { allConflictsResolved, makeUniqueName } from "./conflicts";
-import type { ImportPlan, PlannedFile } from "./planner";
+import { normalizeName, type ImportPlan, type PlannedFile } from "./planner";
 import type { FileStat } from "./scanner";
 
 export interface AttachmentContext {
@@ -99,7 +99,7 @@ export async function executeImport(
 
       await ensureUnchanged(file, port);
       const collectionID = await port.ensureCollection(plan.baseCollectionID, file.target.segments);
-      const contentKey = `${file.size}:${file.md5}`;
+      const contentKey = `${file.size}:${file.md5}:${normalizeName(file.name)}`;
       const importedEarlier = contentAttachments.get(contentKey);
       if (importedEarlier !== undefined) {
         await port.linkExisting(importedEarlier, collectionID, file.name, false);
@@ -156,8 +156,11 @@ export async function executeImport(
         const contexts = await Promise.all(
           file.existingAttachmentIDs.map((id) => port.getAttachmentContext(id)),
         );
+        if (contexts.length !== 1) {
+          throw new Error("Replace is disabled when multiple existing attachments share the filename");
+        }
         if (!file.replaceAllowed || contexts.some((context) => context.hasAnnotations)) {
-          throw new Error("Replace is disabled because an existing attachment has annotations");
+          throw new Error("Replace is disabled because the existing attachment has annotations");
         }
 
         const parentID = contexts.find((context) => context.parentID)?.parentID || undefined;
@@ -182,12 +185,24 @@ export async function executeImport(
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      onProgress?.({ completed: index + 1, total: plan.files.length, path: file.relativePath, result });
+      try {
+        onProgress?.({ completed: index + 1, total: plan.files.length, path: file.relativePath, result });
+      } catch {
+        // Progress UI is advisory. Closing or tearing down the dialog must not stop imports.
+      }
     }
   }
 
   if (result.importedAttachmentIDs.length) {
-    await port.indexAttachments(result.importedAttachmentIDs);
+    try {
+      await port.indexAttachments(result.importedAttachmentIDs);
+    } catch (error) {
+      result.failed += 1;
+      result.errors.push({
+        path: "[full-text-index]",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   return result;
 }

@@ -157,14 +157,30 @@ describe("executeImport", () => {
     expect(events).not.toContain("trash:9");
   });
 
+  it("refuses to replace multiple same-name attachments as one operation", async () => {
+    const { port, events } = fakePort();
+    const input = plan([planned({
+      classification: "conflict",
+      conflictAction: "replace",
+      replaceAllowed: true,
+      existingAttachmentIDs: [9, 10],
+    })]);
+
+    const result = await executeImport(input, port);
+
+    expect(result.failed).toBe(1);
+    expect(events.some((event) => event.startsWith("trash:"))).toBe(false);
+    expect(events.some((event) => event.startsWith("import:"))).toBe(false);
+  });
+
   it("imports repeated source content once and links it to later target collections", async () => {
     const { port, events } = fakePort();
     const input = plan([
       planned({ md5: "same" }),
       planned({
-        absolutePath: "/source/sub/alias.pdf",
-        relativePath: "sub/alias.pdf",
-        name: "alias.pdf",
+        absolutePath: "/source/sub/paper.pdf",
+        relativePath: "sub/paper.pdf",
+        name: "paper.pdf",
         md5: "same",
         target: { segments: ["Root", "sub"] },
         classification: "reused",
@@ -176,7 +192,48 @@ describe("executeImport", () => {
     const result = await executeImport(input, port);
 
     expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(1);
-    expect(events).toContain("link:100:7:alias.pdf:rename=false");
+    expect(events).toContain("link:100:7:paper.pdf:rename=false");
     expect(result).toMatchObject({ imported: 1, reused: 1 });
+  });
+
+  it("stores same-content files separately when their filenames differ", async () => {
+    const { port, events } = fakePort();
+    const input = plan([
+      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf", md5: "same" }),
+      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf", md5: "same" }),
+    ]);
+
+    const result = await executeImport(input, port);
+
+    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(2);
+    expect(result.imported).toBe(2);
+  });
+
+  it("keeps successful import counts when full-text indexing reports an error", async () => {
+    const { port } = fakePort();
+    port.indexAttachments = async () => {
+      throw new Error("index unavailable");
+    };
+
+    const result = await executeImport(plan([planned()]), port);
+
+    expect(result.imported).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.errors).toEqual([{ path: "[full-text-index]", message: "index unavailable" }]);
+  });
+
+  it("continues importing when the progress callback is no longer available", async () => {
+    const { port, events } = fakePort();
+    const input = plan([
+      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf", md5: "a" }),
+      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf", md5: "b" }),
+    ]);
+
+    const result = await executeImport(input, port, () => {
+      throw new Error("dialog closed");
+    });
+
+    expect(result.imported).toBe(2);
+    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(2);
   });
 });

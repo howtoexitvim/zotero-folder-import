@@ -62,10 +62,12 @@ export function getLibraryCollections(libraryID: number): ExistingCollection[] {
 export async function getExistingAttachments(
   libraryID: number,
   sourceFiles: SourceFile[],
+  onError?: (error: { path: string; message: string }) => void,
 ): Promise<ExistingAttachment[]> {
   const sourceSizes = new Set(sourceFiles.map((file) => file.size));
   const items = await Zotero.Items.getAll(libraryID, false, false, false);
   const attachments: ExistingAttachment[] = [];
+  await Zotero.Items.loadDataTypes(items, ["childItems", "collections"]);
 
   for (const item of items) {
     if (!item.isStoredFileAttachment?.()) continue;
@@ -90,7 +92,11 @@ export async function getExistingAttachments(
       if (syncedHash && syncedMtime != null && Math.trunc(syncedMtime) === Math.trunc(stat.lastModified)) {
         md5 = syncedHash;
       } else {
-        md5 = await item.attachmentHash;
+        try {
+          md5 = await item.attachmentHash;
+        } catch (error) {
+          onError?.({ path, message: `Unable to hash existing attachment: ${errorMessage(error)}` });
+        }
       }
     }
 
@@ -157,6 +163,7 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
   async getAttachmentContext(id: number) {
     const attachment = await Zotero.Items.getAsync(id);
     if (!attachment?.isStoredFileAttachment?.()) throw new Error(`Attachment ${id} is unavailable`);
+    await Zotero.Items.loadDataTypes([attachment], ["childItems"]);
     return {
       id,
       parentID: attachment.parentID,
@@ -197,6 +204,9 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
   ): Promise<void> {
     const attachment = await Zotero.Items.getAsync(attachmentID);
     if (!attachment?.isStoredFileAttachment?.()) throw new Error(`Attachment ${attachmentID} is unavailable`);
+    const container = attachment.parentID ? await Zotero.Items.getAsync(attachment.parentID) : attachment;
+    await Zotero.Items.loadDataTypes([attachment], ["itemData"]);
+    await Zotero.Items.loadDataTypes([container], ["collections"]);
     if (renameToSource) {
       const renamed = await attachment.renameAttachmentFile(sourceName, {
         overwrite: false,
@@ -208,7 +218,6 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
       await attachment.saveTx({ skipDateModifiedUpdate: true });
     }
 
-    const container = attachment.parentID ? await Zotero.Items.getAsync(attachment.parentID) : attachment;
     if (!container.inCollection(collectionID)) {
       container.addToCollection(collectionID);
       await container.saveTx({ skipDateModifiedUpdate: true });

@@ -91,6 +91,7 @@ function resolveTarget(
 
 export function buildImportPlan(input: BuildPlanInput): ImportPlan {
   const sourceContent = new Map<string, PlannedFile>();
+  const claimedExistingAttachments = new Set<number>();
   const files = [...input.files]
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath, "en"))
     .map<PlannedFile>((file) => {
@@ -99,7 +100,8 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
       const segments = [input.rootName, ...relativeDirectory(file.relativePath)];
       const target = resolveTarget(segments, input.baseCollectionID, input.collections);
       const contentKey = `${file.size}:${file.md5}`;
-      const previousSource = sourceContent.get(contentKey);
+      const sourceIdentityKey = `${contentKey}:${normalizeName(file.name)}`;
+      const previousSource = sourceContent.get(sourceIdentityKey);
       if (previousSource && previousSource.classification !== "conflict") {
         return {
           ...file,
@@ -111,7 +113,9 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
       }
 
       const sameContent = input.attachments.filter(
-        (attachment) => attachment.size === file.size && attachment.md5 === file.md5,
+        (attachment) => attachment.size === file.size
+          && attachment.md5 === file.md5
+          && !claimedExistingAttachments.has(attachment.id),
       );
       if (sameContent.length) {
         const planned: PlannedFile = {
@@ -120,7 +124,8 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
           classification: "reused",
           existingAttachmentIDs: sameContent.map(({ id }) => id),
         };
-        sourceContent.set(contentKey, planned);
+        sourceContent.set(sourceIdentityKey, planned);
+        sameContent.forEach((attachment) => claimedExistingAttachments.add(attachment.id));
         return planned;
       }
 
@@ -137,9 +142,9 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
           classification: "conflict",
           existingAttachmentIDs: conflicts.map(({ id }) => id),
           conflictAction: "unresolved",
-          replaceAllowed: conflicts.every((attachment) => !attachment.hasAnnotations),
+          replaceAllowed: conflicts.length === 1 && conflicts.every((attachment) => !attachment.hasAnnotations),
         };
-        sourceContent.set(contentKey, planned);
+        sourceContent.set(sourceIdentityKey, planned);
         return planned;
       }
 
@@ -149,7 +154,7 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
         classification: "new",
         existingAttachmentIDs: [],
       };
-      sourceContent.set(contentKey, planned);
+      sourceContent.set(sourceIdentityKey, planned);
       return planned;
     });
 

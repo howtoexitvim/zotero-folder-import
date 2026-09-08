@@ -107,7 +107,11 @@ export class FolderImportController {
     }
 
     const collections = getLibraryCollections(destination.libraryID);
-    const attachments = await getExistingAttachments(destination.libraryID, hashed.files);
+    const attachments = await getExistingAttachments(
+      destination.libraryID,
+      hashed.files,
+      (error) => scanErrors.push(error),
+    );
     const plan = buildImportPlan({
       rootName: rootName(sourcePath),
       baseCollectionID: destination.baseCollectionID,
@@ -137,4 +141,3 @@ export class FolderImportController {
     );
   }
 }
-

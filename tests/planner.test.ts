@@ -88,6 +88,20 @@ describe("buildImportPlan", () => {
     });
   });
 
+  it("disables bulk replacement when multiple existing attachments share the name", () => {
+    const plan = buildImportPlan({
+      rootName: "Root",
+      files: [source("Paper.pdf", "new")],
+      collections: [{ id: 10, libraryID: 1, name: "Root" }],
+      attachments: [
+        { id: 1, name: "paper.pdf", size: 9, md5: "one", collectionIDs: [10], hasAnnotations: false },
+        { id: 2, name: "PAPER.PDF", size: 11, md5: "two", collectionIDs: [10], hasAnnotations: false },
+      ],
+    });
+
+    expect(plan.files[0]).toMatchObject({ classification: "conflict", replaceAllowed: false });
+  });
+
   it("treats a changed name and changed content as a new file", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
@@ -112,14 +126,25 @@ describe("buildImportPlan", () => {
   it("plans repeated source content as one new file followed by a source reuse", () => {
     const plan = buildImportPlan({
       rootName: "Root",
-      files: [source("a.pdf", "same"), source("sub/b.pdf", "same")],
+      files: [source("a/paper.pdf", "same"), source("b/paper.pdf", "same")],
       collections: [],
       attachments: [],
     });
 
     expect(plan.files.map((file) => file.classification)).toEqual(["new", "reused"]);
-    expect(plan.files[1].sourceDuplicateOf).toBe("a.pdf");
+    expect(plan.files[1].sourceDuplicateOf).toBe("a/paper.pdf");
     expect(plan.summary).toMatchObject({ new: 1, reused: 1 });
+  });
+
+  it("keeps same-content files separate when their source filenames differ", () => {
+    const plan = buildImportPlan({
+      rootName: "Root",
+      files: [source("a.pdf", "same"), source("b.pdf", "same")],
+      collections: [],
+      attachments: [],
+    });
+
+    expect(plan.files.map((file) => file.classification)).toEqual(["new", "new"]);
   });
 });
 
