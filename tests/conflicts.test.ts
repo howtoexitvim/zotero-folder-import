@@ -16,7 +16,6 @@ function conflict(path: string, replaceAllowed: boolean): PlannedFile {
     extension: "pdf",
     size: 10,
     mtime: 100,
-    md5: path,
     target: { segments: ["Root"] },
     classification: "conflict",
     existingAttachmentIDs: [1],

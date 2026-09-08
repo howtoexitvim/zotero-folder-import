@@ -6,8 +6,8 @@
  */
 import type { SourceFile } from "./scanner";
 
-/** What will happen to a file. "reused" means it is already in the library. */
-export type Classification = "new" | "reused" | "conflict" | "unsupported" | "error";
+/** What will happen to a file. */
+export type Classification = "new" | "conflict" | "unsupported" | "error";
 /** How the user chose to resolve a same-name clash. */
 export type ConflictAction = "replace" | "ignore" | "keep-both" | "unresolved";
 
@@ -24,8 +24,6 @@ export interface ExistingAttachment {
   id: number;
   parentID?: number | false;
   name: string;
-  size: number;
-  md5: string;
   collectionIDs: number[];
   hasAnnotations: boolean;
 }
@@ -43,7 +41,6 @@ export interface PlannedFile extends SourceFile {
   existingAttachmentIDs: number[];
   conflictAction?: ConflictAction;
   replaceAllowed?: boolean;
-  sourceDuplicateOf?: string;
 }
 
 /** The complete preview: every file, the collections to create, and totals. */
@@ -56,7 +53,6 @@ export interface ImportPlan {
     total: number;
     bytes: number;
     new: number;
-    reused: number;
     conflict: number;
   };
 }
@@ -111,54 +107,23 @@ function resolveTarget(
 }
 
 /**
- * Classifies every scanned file.
+ * Classifies every scanned file by name against the destination collection.
  *
- * A file whose size and MD5 match an existing attachment is "reused": Zotero
- * items can live in several collections, so it is filed into the target rather
- * than copied again. A file that only shares a filename with something already
- * in the target collection is a "conflict" and needs the user to choose.
- * Everything else is "new".
+ * This deliberately mirrors a file manager: a clash is a file of the same name
+ * in the folder you are importing into, and nothing else. Copies elsewhere in
+ * the library are ignored, so each import produces its own attachment and
+ * deleting one never affects another. Everything that does not clash is "new".
  */
 export function buildImportPlan(input: BuildPlanInput): ImportPlan {
-  const sourceContent = new Map<string, PlannedFile>();
-  const claimedExistingAttachments = new Set<number>();
   const files = [...input.files]
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath, "en"))
     .map<PlannedFile>((file) => {
-      if (!file.md5) throw new Error(`Missing MD5 for ${file.absolutePath}`);
-
       const segments = [input.rootName, ...relativeDirectory(file.relativePath)];
       const target = resolveTarget(segments, input.baseCollectionID, input.collections);
-      const contentKey = `${file.size}:${file.md5}`;
-      const sourceIdentityKey = `${contentKey}:${normalizeName(file.name)}`;
-      const previousSource = sourceContent.get(sourceIdentityKey);
-      if (previousSource && previousSource.classification !== "conflict") {
-        return {
-          ...file,
-          target,
-          classification: "reused",
-          existingAttachmentIDs: previousSource.existingAttachmentIDs,
-          sourceDuplicateOf: previousSource.relativePath,
-        };
-      }
 
-      const sameContent = input.attachments.filter(
-        (attachment) => attachment.size === file.size
-          && attachment.md5 === file.md5
-          && !claimedExistingAttachments.has(attachment.id),
-      );
-      if (sameContent.length) {
-        const planned: PlannedFile = {
-          ...file,
-          target,
-          classification: "reused",
-          existingAttachmentIDs: sameContent.map(({ id }) => id),
-        };
-        sourceContent.set(sourceIdentityKey, planned);
-        sameContent.forEach((attachment) => claimedExistingAttachments.add(attachment.id));
-        return planned;
-      }
-
+      // Only the destination collection is examined, and only by filename --
+      // the same rule a file manager uses. A copy of this file elsewhere in the
+      // library is none of this import's business.
       const conflicts = target.existingCollectionID === undefined
         ? []
         : input.attachments.filter(
@@ -166,7 +131,7 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
             && normalizeName(attachment.name) === normalizeName(file.name),
         );
       if (conflicts.length) {
-        const planned: PlannedFile = {
+        return {
           ...file,
           target,
           classification: "conflict",
@@ -174,18 +139,14 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
           conflictAction: "unresolved",
           replaceAllowed: conflicts.length === 1 && conflicts.every((attachment) => !attachment.hasAnnotations),
         };
-        sourceContent.set(sourceIdentityKey, planned);
-        return planned;
       }
 
-      const planned: PlannedFile = {
+      return {
         ...file,
         target,
         classification: "new",
         existingAttachmentIDs: [],
       };
-      sourceContent.set(sourceIdentityKey, planned);
-      return planned;
     });
 
   const collectionPaths = new Map<string, string[]>();
@@ -204,7 +165,6 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
       total: files.length,
       bytes: files.reduce((total, file) => total + file.size, 0),
       new: files.filter((file) => file.classification === "new").length,
-      reused: files.filter((file) => file.classification === "reused").length,
       conflict: files.filter((file) => file.classification === "conflict").length,
     },
   };

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildImportPlan, normalizeName } from "../src/core/planner";
 import type { SourceFile } from "../src/core/scanner";
 
-function source(relativePath: string, md5: string, size = 10): SourceFile {
+function source(relativePath: string, _md5 = "", size = 10): SourceFile {
   const name = relativePath.split("/").at(-1)!;
   return {
     absolutePath: `/source/${relativePath}`,
@@ -12,7 +12,6 @@ function source(relativePath: string, md5: string, size = 10): SourceFile {
     extension: name.toLowerCase().endsWith(".epub") ? "epub" : "pdf",
     size,
     mtime: 100,
-    md5,
   };
 }
 
@@ -38,7 +37,7 @@ describe("buildImportPlan", () => {
     ]);
   });
 
-  it("classifies same content as reuse before considering a same-name conflict", () => {
+  it("treats a same-name file in the destination as a conflict, whatever its content", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
       baseCollectionID: 5,
@@ -49,17 +48,17 @@ describe("buildImportPlan", () => {
           id: 90,
           parentID: 80,
           name: "Paper.pdf",
-          size: 10,
-          md5: "same",
           collectionIDs: [10],
           hasAnnotations: false,
         },
       ],
     });
 
-    expect(plan.files[0].classification).toBe("reused");
+    // Identical content elsewhere in the library is irrelevant: only the
+    // destination collection is consulted, and only by filename.
+    expect(plan.files[0].classification).toBe("conflict");
     expect(plan.files[0].existingAttachmentIDs).toEqual([90]);
-    expect(plan.summary).toMatchObject({ new: 0, reused: 1, conflict: 0 });
+    expect(plan.summary).toMatchObject({ new: 0, conflict: 1 });
   });
 
   it("marks a different-content same-name attachment as an unresolved conflict", () => {
@@ -72,8 +71,6 @@ describe("buildImportPlan", () => {
         {
           id: 90,
           name: "paper.PDF",
-          size: 10,
-          md5: "old",
           collectionIDs: [10],
           hasAnnotations: true,
         },
@@ -94,8 +91,8 @@ describe("buildImportPlan", () => {
       files: [source("Paper.pdf", "new")],
       collections: [{ id: 10, libraryID: 1, name: "Root" }],
       attachments: [
-        { id: 1, name: "paper.pdf", size: 9, md5: "one", collectionIDs: [10], hasAnnotations: false },
-        { id: 2, name: "PAPER.PDF", size: 11, md5: "two", collectionIDs: [10], hasAnnotations: false },
+        { id: 1, name: "paper.pdf", collectionIDs: [10], hasAnnotations: false },
+        { id: 2, name: "PAPER.PDF", collectionIDs: [10], hasAnnotations: false },
       ],
     });
 
@@ -112,8 +109,6 @@ describe("buildImportPlan", () => {
         {
           id: 90,
           name: "Old.pdf",
-          size: 10,
-          md5: "old",
           collectionIDs: [10],
           hasAnnotations: false,
         },
@@ -123,7 +118,7 @@ describe("buildImportPlan", () => {
     expect(plan.files[0].classification).toBe("new");
   });
 
-  it("plans repeated source content as one new file followed by a source reuse", () => {
+  it("imports the same file into two source folders as two independent copies", () => {
     const plan = buildImportPlan({
       rootName: "Root",
       files: [source("a/paper.pdf", "same"), source("b/paper.pdf", "same")],
@@ -131,9 +126,10 @@ describe("buildImportPlan", () => {
       attachments: [],
     });
 
-    expect(plan.files.map((file) => file.classification)).toEqual(["new", "reused"]);
-    expect(plan.files[1].sourceDuplicateOf).toBe("a/paper.pdf");
-    expect(plan.summary).toMatchObject({ new: 1, reused: 1 });
+    // Two folders means two destination collections, so each gets its own
+    // attachment -- deleting one never affects the other.
+    expect(plan.files.map((file) => file.classification)).toEqual(["new", "new"]);
+    expect(plan.summary).toMatchObject({ new: 2, conflict: 0 });
   });
 
   it("keeps same-content files separate when their source filenames differ", () => {

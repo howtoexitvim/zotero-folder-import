@@ -25,13 +25,12 @@ export interface FileSystemPort {
   stat(path: string): Promise<FileStat>;
 }
 
-/** One file found on disk. md5 is filled in later, only when needed. */
+/** One file found on disk. */
 export interface SourceFile extends FileStat {
   absolutePath: string;
   relativePath: string;
   name: string;
   extension: SupportedExtension;
-  md5?: string;
 }
 
 export interface ScanError {

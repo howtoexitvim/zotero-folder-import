@@ -51,7 +51,6 @@ function initWords(): void {
   words = zh
     ? {
       new: "新导入",
-      reused: "已在库中，加入此 collection",
       conflict: "冲突",
       annotated: "含标注或存在多个旧附件，不能替换",
       unresolved: "请选择…",
@@ -72,7 +71,6 @@ function initWords(): void {
       mFiles: "个文件",
       mSize: "总大小",
       mNew: "新导入",
-      mReused: "已在库中",
       mConflicts: "冲突",
       mUnsupported: "不支持",
       mErrors: "错误",
@@ -89,7 +87,6 @@ function initWords(): void {
     }
     : {
       new: "New",
-      reused: "Already in library — added here",
       conflict: "Conflict",
       annotated: "Annotations or multiple existing files; Replace unavailable",
       unresolved: "Choose…",
@@ -110,7 +107,6 @@ function initWords(): void {
       mFiles: "files",
       mSize: "total size",
       mNew: "new",
-      mReused: "already in library",
       mConflicts: "conflicts",
       mUnsupported: "unsupported",
       mErrors: "errors",
@@ -212,7 +208,6 @@ function renderSummary(): void {
   setText(byId("lbl-files"), words.mFiles);
   setText(byId("lbl-size"), words.mSize);
   setText(byId("lbl-new"), words.mNew);
-  setText(byId("lbl-reused"), words.mReused);
   setText(byId("lbl-conflicts"), words.mConflicts);
   setText(byId("lbl-unsupported"), words.mUnsupported);
   setText(byId("lbl-errors"), words.mErrors);
@@ -237,7 +232,6 @@ function renderSummary(): void {
   setText(byId("count-total"), String(data.plan.summary.total));
   setText(byId("count-size"), formatBytes(data.plan.summary.bytes));
   setText(byId("count-new"), String(data.plan.summary.new));
-  setText(byId("count-reused"), String(data.plan.summary.reused));
   setText(byId("count-conflicts"), String(data.plan.summary.conflict));
   setText(byId("count-unsupported"), String(data.unsupportedCount));
   setText(byId("count-errors"), String(data.scanErrors.length));
@@ -275,11 +269,7 @@ function renderFiles(): void {
     fileCell.setAttribute("crop", "center");
     fileCell.setAttribute("tooltiptext", file.relativePath);
     appendCell(row, formatBytes(file.size), "col-size");
-    const status = file.classification === "new"
-      ? words.new
-      : file.classification === "reused"
-        ? words.reused
-        : words.conflict;
+    const status = file.classification === "new" ? words.new : words.conflict;
     appendCell(row, status, `col-status status-${file.classification}`);
 
     if (file.classification !== "conflict") {
@@ -368,6 +358,10 @@ function resizeToContent(): void {
   window.requestAnimationFrame(() => {
     try {
       const root = byId("folder-import-root");
+      // The root flexes to fill the window, so measuring it just returns the
+      // current height. Drop the flex, let layout collapse to the content, then
+      // measure. sizeToContent() would ignore our explicit width.
+      root.removeAttribute("flex");
       const content = root.getBoundingClientRect().height;
       const chrome = window.outerHeight - window.innerHeight;
       const height = Math.min(
@@ -395,7 +389,6 @@ function renderResult(result: ImportResult): void {
   setHidden(byId("cancel-button"), true);
   setText(byId("result-summary"), [
     `${words.new}: ${result.imported}`,
-    `${words.reused}: ${result.reused}`,
     `${words.replace}: ${result.replaced}`,
     `${words.keepBoth}: ${result.keptBoth}`,
     `${words.ignore}: ${result.ignored}`,
@@ -428,7 +421,6 @@ async function beginImport(): Promise<void> {
     importing = false;
     renderResult({
       imported: 0,
-      reused: 0,
       ignored: 0,
       replaced: 0,
       keptBoth: 0,

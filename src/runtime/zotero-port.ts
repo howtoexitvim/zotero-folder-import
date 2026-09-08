@@ -43,27 +43,6 @@ export class ZoteroFileSystemPort implements FileSystemPort {
   }
 }
 
-/**
- * Computes MD5 for each scanned file. A file that cannot be hashed is reported
- * and dropped rather than failing the whole scan.
- */
-export async function hashSourceFiles(
-  files: SourceFile[],
-): Promise<{ files: SourceFile[]; errors: Array<{ path: string; message: string }> }> {
-  const hashed: SourceFile[] = [];
-  const errors: Array<{ path: string; message: string }> = [];
-  for (const file of files) {
-    try {
-      const md5 = await Zotero.Utilities.Internal.md5Async(file.absolutePath);
-      if (!md5) throw new Error("Unable to calculate MD5");
-      hashed.push({ ...file, md5 });
-    } catch (error) {
-      errors.push({ path: file.absolutePath, message: errorMessage(error) });
-    }
-  }
-  return { files: hashed, errors };
-}
-
 /** Flattens the library's collections into the shape the planner expects. */
 export function getLibraryCollections(libraryID: number): ExistingCollection[] {
   return Zotero.Collections.getByLibrary(libraryID, true, false).map((collection: any) => ({
@@ -75,19 +54,15 @@ export function getLibraryCollections(libraryID: number): ExistingCollection[] {
 }
 
 /**
- * Collects the library's stored PDF/EPUB attachments so the planner can spot
- * files that are already present.
+ * Collects the library's stored PDF/EPUB attachments and which collections they
+ * belong to, so the planner can detect same-name clashes in the destination.
  *
- * Hashing is the expensive part, so it is skipped unless an attachment's size
- * matches one of the source files, and Zotero's synced hash is reused when its
- * recorded mtime still matches the file on disk.
+ * No hashing is performed: files are matched by name within the target
+ * collection, so content never has to be read.
  */
 export async function getExistingAttachments(
   libraryID: number,
-  sourceFiles: SourceFile[],
-  onError?: (error: { path: string; message: string }) => void,
 ): Promise<ExistingAttachment[]> {
-  const sourceSizes = new Set(sourceFiles.map((file) => file.size));
   const all = await Zotero.Items.getAll(libraryID, false, false, false);
   // Narrow to stored file attachments before loading data types or touching the
   // disk; loading every item in a large library blocks the UI thread for
@@ -110,34 +85,11 @@ export async function getExistingAttachments(
       continue;
     }
 
-    let stat: any;
-    try {
-      stat = await IOUtils.stat(path);
-    } catch {
-      continue;
-    }
-    let md5 = "";
-    if (sourceSizes.has(stat.size)) {
-      const syncedHash = item.attachmentSyncedHash;
-      const syncedMtime = item.attachmentSyncedModificationTime;
-      if (syncedHash && syncedMtime != null && Math.trunc(syncedMtime) === Math.trunc(stat.lastModified)) {
-        md5 = syncedHash;
-      } else {
-        try {
-          md5 = await item.attachmentHash;
-        } catch (error) {
-          onError?.({ path, message: `Unable to hash existing attachment: ${errorMessage(error)}` });
-        }
-      }
-    }
-
     const container = item.parentID ? await Zotero.Items.getAsync(item.parentID) : item;
     attachments.push({
       id: item.id,
       parentID: item.parentID,
       name,
-      size: stat.size,
-      md5: md5 || "",
       collectionIDs: container?.getCollections(false) ?? [],
       hasAnnotations: item.getAnnotations(false).length > 0,
     });
@@ -233,31 +185,6 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     await attachment.saveTx({ skipDateModifiedUpdate: true });
     if (request.collectionID) this.rememberName(request.collectionID, request.name);
     return attachment.id;
-  }
-
-  /**
-   * Zotero items can belong to several collections at once, so a file that is
-   * already in the library just gets added to the new collection. The existing
-   * item is never renamed: it may be filed elsewhere under a name the user
-   * chose, and silently rewriting that to match the folder being imported
-   * would change entries the user did not ask to touch.
-   */
-  async linkExisting(
-    attachmentID: number,
-    collectionID: number,
-    sourceName: string,
-  ): Promise<void> {
-    const attachment = await Zotero.Items.getAsync(attachmentID);
-    if (!attachment?.isStoredFileAttachment?.()) throw new Error(`Attachment ${attachmentID} is unavailable`);
-    const container = attachment.parentID ? await Zotero.Items.getAsync(attachment.parentID) : attachment;
-    await Zotero.Items.loadDataTypes([container], ["collections"]);
-
-    if (!container.inCollection(collectionID)) {
-      container.addToCollection(collectionID);
-      await container.saveTx({ skipDateModifiedUpdate: true });
-    }
-    const actualPath = await attachment.getFilePathAsync();
-    this.rememberName(collectionID, actualPath ? PathUtils.filename(actualPath) : sourceName);
   }
 
   /** Moves replaced attachments to the trash (recoverable, never deleted). */

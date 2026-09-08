@@ -26,15 +26,16 @@ The executor refuses plans with unresolved conflicts. Replace imports first and 
 
 ### How a file is classified
 
-| Status |判据 | 行为 |
+判据只有一条:**目标 collection 里有没有同名文件**。和文件管理器一致 —— 不看内容,不扫全库。
+
+| Status | 判据 | 行为 |
 | --- | --- | --- |
-| **New** | 库里没有相同内容 | 复制进 Zotero storage,保留原文件名 |
-| **Already in library** | size + MD5 与库中某附件完全一致 | 把**已有的 item** 加进目标 collection。不复制、不改名、不询问 |
-| **Conflict** | 目标 collection 内已有**同名**文件,但内容不同 | 让用户选 Replace / Keep Both / Ignore |
+| **New** | 目标 collection 内无同名文件 | 复制进 Zotero storage,保留原文件名 |
+| **Conflict** | 目标 collection 内已有同名文件 | 让用户选 Replace / Keep Both / Ignore |
 
-Zotero 的 item 可以同时属于多个 collection,所以 "already in library" 不需要询问 —— Keep Both 会得到两份逐字节相同的文件,Replace 用 A 换 A 是空操作。但这也意味着**共享 item 就共享一切**:标注、笔记、标签,以及删除。
+每次导入都产生**自己的 attachment**。同一个 PDF 导进两个 collection 就是两个独立 item、两个独立 storage 目录 —— 在一处 Cmd+Delete、加标注、改标题,都**不影响另一处**。代价是各占一份磁盘空间,这与 Finder 里复制文件到两个文件夹的行为一致。
 
-删除行为取决于按键:在 collection 里按 Delete 走 `removeFromCollection`(其他位置保留);Cmd+Delete 或在 My Library 根删除走 `trashTx`(所有位置一起消失)。提示语分别是 "Remove from Collection" 和 "Move to Trash"。
+删除行为取决于按键:在 collection 里按 Delete 走 `removeFromCollection`(把 item 从这个 collection 摘掉);Cmd+Delete 或在 My Library 根删除走 `trashTx`(item 本体进垃圾桶)。提示语分别是 "Remove from Collection" 和 "Move to Trash"。
 
 ### 已知的 Zotero 10 约束
 
@@ -50,19 +51,19 @@ Zotero 的 item 可以同时属于多个 collection,所以 "already in library" 
 | 优先级 | 问题 | 现状 | 更优雅的方案 |
 | --- | --- | --- | --- |
 | ~~P1~~ | ~~导入无法取消~~ | **已完成 (0.1.17)**:导入中 Cancel 变为「停止导入」,循环每轮检查标志位。已导入的保留,未导入的跳过,结果页标记为「已取消导入」 | — |
-| **P1** | "Already in library" 强制共享 item | 只要库中任何位置有同内容文件就复用同一个 item,标注/笔记/删除全部联动。**这是本插件的设计选择,不是 Zotero 限制** —— 见下方「为什么 MD5 匹配是可选的」 | 改为 Finder 心智:只在**目标 collection 内按文件名**判重,不重名就独立导入。MD5 降级为可选提示(「库中已有,可改为引用」),默认独立。顺带消除下面的 P2 |
-| **P2** | MD5 匹配要遍历全库 | `getExistingAttachments()` 拉取全库附件,对 size 匹配的算 MD5。已复用 `attachmentSyncedHash` 并每 25 条让出主线程,但仍是 O(库大小) | 若采纳上面的方案则**自然消失**(只查目标 collection,O(collection))。若保留 MD5 匹配,则走 `Zotero.DB` 在 SQL 层按 size 过滤 |
+| ~~P1~~ | ~~"Already in library" 强制共享 item~~ | **已完成 (0.1.18)**:改为只按目标 collection 内的文件名判重,每次导入产生独立 attachment。删除、标注不再跨位置联动 | — |
+| ~~P2~~ | ~~MD5 匹配要遍历全库~~ | **已随上一条消失 (0.1.18)**:不再计算任何哈希,也不再读取文件内容 | — |
 
-### 为什么 MD5 匹配是可选的
+### 为什么不按 MD5 判重(查证记录)
 
-一度以为「Zotero 底层按 MD5 认文件,所以必须匹配,否则 Cmd+Delete 会误删另一份」。**查证后确认这是错的**:
+一度以为「Zotero 底层按 MD5 认文件,所以必须匹配,否则 Cmd+Delete 会误删另一份」。**查证后确认这是错的**,0.1.18 据此把判重改成了纯文件名:
 
 - attachment 的存储目录按**随机 item key** 分(`attachments.js:2773` → `dataObject.js:1585` → `randomString(8)`),与内容无关。两个同内容 PDF 存在两个独立目录,各一份物理副本。
 - `importFromFile` 里**没有任何 hash 去重逻辑**。
 - Duplicate Items 视图按 **ISBN / DOI / 标题+作者** 匹配(`duplicates.js:194-276`),不按 MD5。
 - MD5(`attachmentSyncedHash`)**只用于 storage sync**(`storageLocal.js` / `webdav.js` / `zfs.js`),判断云端与本地是否需要重传,与删除、去重无关。
 
-结论:独立副本之间**互不影响**,删一个不会动另一个。当前的联动删除完全来自本插件的 `linkExisting()` 复用同一 item,是可以改的。
+结论:独立副本之间**互不影响**,删一个不会动另一个。此前观察到的「Cmd+Delete 删掉另一边」完全来自本插件早期用 `linkExisting()` 复用同一个 item —— 两边看到的是同一条记录,所以删本体时处处消失。0.1.18 移除了这条路径。
 
 ## Compatibility and privacy
 

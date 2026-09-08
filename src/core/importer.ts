@@ -3,7 +3,7 @@
  * through ImportPort so the sequencing can be tested with a fake.
  */
 import { allConflictsResolved, makeUniqueName } from "./conflicts";
-import { normalizeName, type ImportPlan, type PlannedFile } from "./planner";
+import type { ImportPlan, PlannedFile } from "./planner";
 import type { FileStat } from "./scanner";
 
 /** State of an existing attachment, re-checked before a destructive Replace. */
@@ -27,11 +27,6 @@ export interface ImportPort {
   ensureCollection(baseCollectionID: number | undefined, segments: string[]): Promise<number>;
   getAttachmentContext(id: number): Promise<AttachmentContext>;
   importStored(request: ImportStoredRequest): Promise<number>;
-  linkExisting(
-    attachmentID: number,
-    collectionID: number,
-    sourceName: string,
-  ): Promise<void>;
   trashAttachments(ids: number[]): Promise<void>;
   occupiedNames(collectionID: number): Promise<string[]>;
   indexAttachments(ids: number[]): Promise<void>;
@@ -48,7 +43,6 @@ export interface ImportResult {
   /** True when the user stopped the run before every file was processed. */
   cancelled?: boolean;
   imported: number;
-  reused: number;
   ignored: number;
   replaced: number;
   keptBoth: number;
@@ -69,7 +63,6 @@ export interface ImportProgress {
 function emptyResult(): ImportResult {
   return {
     imported: 0,
-    reused: 0,
     ignored: 0,
     replaced: 0,
     keptBoth: 0,
@@ -114,7 +107,6 @@ export async function executeImport(
 ): Promise<ImportResult> {
   assertResolved(plan);
   const result = emptyResult();
-  const contentAttachments = new Map<string, number>();
 
   for (let index = 0; index < plan.files.length; index += 1) {
     // Checked between files rather than mid-file, so a cancel never leaves an
@@ -132,32 +124,6 @@ export async function executeImport(
 
       await ensureUnchanged(file, port);
       const collectionID = await port.ensureCollection(plan.baseCollectionID, file.target.segments);
-      const contentKey = `${file.size}:${file.md5}:${normalizeName(file.name)}`;
-      const importedEarlier = contentAttachments.get(contentKey);
-      if (importedEarlier !== undefined) {
-        await port.linkExisting(importedEarlier, collectionID, file.name);
-        result.reused += 1;
-        continue;
-      }
-
-      if (file.classification === "reused") {
-        if (!file.existingAttachmentIDs.length) {
-          const attachmentID = await port.importStored({
-            path: file.absolutePath,
-            name: file.name,
-            collectionID,
-          });
-          contentAttachments.set(contentKey, attachmentID);
-          result.importedAttachmentIDs.push(attachmentID);
-          result.imported += 1;
-          continue;
-        }
-        const attachmentID = Math.min(...file.existingAttachmentIDs);
-        await port.linkExisting(attachmentID, collectionID, file.name);
-        contentAttachments.set(contentKey, attachmentID);
-        result.reused += 1;
-        continue;
-      }
 
       if (file.classification === "new") {
         const attachmentID = await port.importStored({
@@ -165,7 +131,6 @@ export async function executeImport(
           name: file.name,
           collectionID,
         });
-        contentAttachments.set(contentKey, attachmentID);
         result.importedAttachmentIDs.push(attachmentID);
         result.imported += 1;
         continue;
@@ -179,7 +144,6 @@ export async function executeImport(
           name,
           collectionID,
         });
-        contentAttachments.set(contentKey, attachmentID);
         result.importedAttachmentIDs.push(attachmentID);
         result.keptBoth += 1;
         continue;
@@ -203,11 +167,7 @@ export async function executeImport(
           collectionID: parentID ? undefined : collectionID,
           parentItemID: parentID || undefined,
         });
-        if (parentID) {
-          await port.linkExisting(attachmentID, collectionID, file.name);
-        }
         await port.trashAttachments(file.existingAttachmentIDs);
-        contentAttachments.set(contentKey, attachmentID);
         result.importedAttachmentIDs.push(attachmentID);
         result.replaced += 1;
       }

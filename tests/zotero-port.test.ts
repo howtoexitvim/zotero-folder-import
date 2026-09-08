@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getExistingAttachments, ZoteroImportPort } from "../src/runtime/zotero-port";
@@ -21,7 +22,6 @@ function source(): SourceFile {
     extension: "pdf",
     size: 10,
     mtime: 100,
-    md5: "source-hash",
   };
 }
 
@@ -57,13 +57,14 @@ function attachment(id: number, path: string, size: number, hash: string | Error
 }
 
 describe("getExistingAttachments", () => {
-  it("loads required Zotero data and continues after one existing hash fails", async () => {
-    const broken = attachment(1, "/storage/broken.pdf", 10, new Error("unreadable"));
-    const unrelated = attachment(2, "/storage/other.pdf", 20, "unused");
-    const items = [broken, unrelated];
+  it("loads names and collections without reading any file content", async () => {
+    const first = attachment(1, "/storage/paper.pdf", 10, "unused");
+    const second = attachment(2, "/storage/other.pdf", 20, "unused");
+    const items = [first, second];
+    let statCalls = 0;
     (globalThis as any).PathUtils = { filename: (path: string) => path.split("/").at(-1)! };
     (globalThis as any).IOUtils = {
-      stat: async (path: string) => ({ size: path.includes("broken") ? 10 : 20, lastModified: 1 }),
+      stat: async () => { statCalls += 1; return { size: 10, lastModified: 1 }; },
     };
     (globalThis as any).Zotero = {
       File: { getExtension: () => "pdf" },
@@ -74,17 +75,15 @@ describe("getExistingAttachments", () => {
         },
       },
     };
-    const errors: Array<{ path: string; message: string }> = [];
 
-    const result = await getExistingAttachments(1, [source()], (error) => errors.push(error));
+    const result = await getExistingAttachments(1);
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({ id: 1, md5: "", collectionIDs: [7] });
+    expect(result[0]).toMatchObject({ id: 1, name: "paper.pdf", collectionIDs: [7] });
     expect(result[1]).toMatchObject({ id: 2, name: "other.pdf" });
-    expect(errors).toEqual([{
-      path: "/storage/broken.pdf",
-      message: "Unable to hash existing attachment: unreadable",
-    }]);
+    // Classification is by filename within the destination collection, so
+    // nothing needs to be hashed or even stat'ed.
+    expect(statCalls).toBe(0);
   });
 });
 
@@ -109,34 +108,18 @@ describe("ZoteroImportPort", () => {
   });
 });
 
-describe("reuse never mutates existing library items", () => {
-  it("adds the item to the collection without renaming it", async () => {
-    const calls: string[] = [];
-    const item = {
-      id: 5,
-      parentID: false,
-      isStoredFileAttachment: () => true,
-      getFilePathAsync: async () => "/storage/User Chosen Name.pdf",
-      inCollection: () => false,
-      addToCollection: (id: number) => calls.push(`addToCollection:${id}`),
-      saveTx: async () => calls.push("saveTx"),
-      renameAttachmentFile: async () => {
-        calls.push("renameAttachmentFile");
-        return true;
-      },
-      setField: () => calls.push("setField"),
-    };
-    (globalThis as any).PathUtils = { filename: (p: string) => p.split("/").at(-1)! };
-    (globalThis as any).Zotero = {
-      Items: { getAsync: async () => item, loadDataTypes: async () => {} },
-    };
+describe("existing library items are never mutated", () => {
+  it("has no code path that renames or re-titles an existing attachment", async () => {
+    const port = await readFile(
+      new URL("../src/runtime/zotero-port.ts", import.meta.url),
+      "utf8",
+    );
 
-    const port = new ZoteroImportPort(1, [], []);
-    await port.linkExisting(5, 7, "Folder Name.pdf");
-
-    // An item already filed elsewhere keeps the name the user gave it.
-    expect(calls).not.toContain("renameAttachmentFile");
-    expect(calls).not.toContain("setField");
-    expect(calls).toContain("addToCollection:7");
+    // Imports create their own attachment, so nothing in the library is ever
+    // renamed. renameAttachmentFile appears only in importStored, where it
+    // restores the source filename on a file this run just created.
+    const renames = port.match(/renameAttachmentFile/g) ?? [];
+    expect(renames).toHaveLength(1);
+    expect(port).not.toContain("linkExisting");
   });
 });

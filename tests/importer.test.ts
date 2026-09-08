@@ -11,7 +11,6 @@ function planned(overrides: Partial<PlannedFile> = {}): PlannedFile {
     extension: "pdf",
     size: 10,
     mtime: 100,
-    md5: "hash",
     target: { segments: ["Root"], existingCollectionID: 7 },
     classification: "new",
     existingAttachmentIDs: [],
@@ -28,7 +27,6 @@ function plan(files: PlannedFile[]): ImportPlan {
       total: files.length,
       bytes: files.reduce((sum, file) => sum + file.size, 0),
       new: files.filter((file) => file.classification === "new").length,
-      reused: files.filter((file) => file.classification === "reused").length,
       conflict: files.filter((file) => file.classification === "conflict").length,
     },
   };
@@ -53,9 +51,6 @@ function fakePort(options: { failImportPath?: string } = {}) {
       if (request.path === options.failImportPath) throw new Error("copy failed");
       return nextID++;
     },
-    async linkExisting(id, collectionID, name) {
-      events.push(`link:${id}:${collectionID}:${name}`);
-    },
     async trashAttachments(ids) {
       events.push(`trash:${ids.join(",")}`);
     },
@@ -78,14 +73,18 @@ describe("executeImport", () => {
     expect(events).toEqual([]);
   });
 
-  it("reuses one matching attachment and preserves the source filename", async () => {
+  it("imports a new file under its source filename", async () => {
     const { port, events } = fakePort();
-    const input = plan([planned({ classification: "reused", existingAttachmentIDs: [22, 11] })]);
+    const input = plan([planned()]);
 
     const result = await executeImport(input, port);
 
-    expect(events).toEqual(["collection:Root", "link:11:7:paper.pdf"]);
-    expect(result.reused).toBe(1);
+    expect(events).toEqual([
+      "collection:Root",
+      "import:/source/paper.pdf:paper.pdf:parent=none",
+      "index:100",
+    ]);
+    expect(result.imported).toBe(1);
   });
 
   it("imports a replacement successfully before trashing the old attachment", async () => {
@@ -102,7 +101,6 @@ describe("executeImport", () => {
     expect(events).toEqual([
       "collection:Root",
       "import:/source/paper.pdf:paper.pdf:parent=50",
-      "link:100:7:paper.pdf",
       "trash:9",
       "index:100",
     ]);
@@ -176,31 +174,29 @@ describe("executeImport", () => {
   it("imports repeated source content once and links it to later target collections", async () => {
     const { port, events } = fakePort();
     const input = plan([
-      planned({ md5: "same" }),
+      planned(),
       planned({
         absolutePath: "/source/sub/paper.pdf",
         relativePath: "sub/paper.pdf",
         name: "paper.pdf",
-        md5: "same",
         target: { segments: ["Root", "sub"] },
-        classification: "reused",
         existingAttachmentIDs: [],
-        sourceDuplicateOf: "paper.pdf",
       }),
     ]);
 
     const result = await executeImport(input, port);
 
-    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(1);
-    expect(events).toContain("link:100:7:paper.pdf");
-    expect(result).toMatchObject({ imported: 1, reused: 1 });
+    // The same file in two source folders becomes two independent attachments,
+    // so deleting one never affects the other.
+    expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(2);
+    expect(result).toMatchObject({ imported: 2 });
   });
 
   it("stores same-content files separately when their filenames differ", async () => {
     const { port, events } = fakePort();
     const input = plan([
-      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf", md5: "same" }),
-      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf", md5: "same" }),
+      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf" }),
+      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf" }),
     ]);
 
     const result = await executeImport(input, port);
@@ -225,8 +221,8 @@ describe("executeImport", () => {
   it("continues importing when the progress callback is no longer available", async () => {
     const { port, events } = fakePort();
     const input = plan([
-      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf", md5: "a" }),
-      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf", md5: "b" }),
+      planned({ name: "a.pdf", relativePath: "a.pdf", absolutePath: "/source/a.pdf" }),
+      planned({ name: "b.pdf", relativePath: "b.pdf", absolutePath: "/source/b.pdf" }),
     ]);
 
     const result = await executeImport(input, port, () => {
@@ -244,7 +240,6 @@ describe("cancellation", () => {
       absolutePath: `/source/${name}`,
       relativePath: name,
       name,
-      md5: name,
     })));
   }
 

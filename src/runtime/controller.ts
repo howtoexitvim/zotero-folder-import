@@ -5,7 +5,6 @@ import { scanFolder } from "../core/scanner";
 import {
   getExistingAttachments,
   getLibraryCollections,
-  hashSourceFiles,
   ZoteroFileSystemPort,
   ZoteroImportPort,
 } from "./zotero-port";
@@ -213,23 +212,18 @@ export class FolderImportController {
 
     const fileSystem = new ZoteroFileSystemPort();
     const scan = await scanFolder(sourcePath, fileSystem);
-    const hashed = await hashSourceFiles(scan.files);
-    const scanErrors = [...scan.errors, ...hashed.errors];
-    if (!hashed.files.length) {
+    const scanErrors = [...scan.errors];
+    if (!scan.files.length) {
       Services.prompt.alert(window, "Folder Import", "No readable PDF or EPUB files were found in this folder.");
       return;
     }
 
     const collections = getLibraryCollections(destination.libraryID);
-    const attachments = await getExistingAttachments(
-      destination.libraryID,
-      hashed.files,
-      (error) => scanErrors.push(error),
-    );
+    const attachments = await getExistingAttachments(destination.libraryID);
     const plan = buildImportPlan({
       rootName: rootName(sourcePath),
       baseCollectionID: destination.baseCollectionID,
-      files: hashed.files,
+      files: scan.files,
       collections,
       attachments,
     });
