@@ -75,7 +75,7 @@ describe("Zotero install manifest", () => {
     expect(code).toContain("createElementNS(HTML_NS");
   });
 
-  it("labels the checkbox from script, not data-l10n-id", async () => {
+  it("gives the bulk conflict buttons labels from script", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),
       "utf8",
@@ -85,13 +85,12 @@ describe("Zotero install manifest", () => {
       "utf8",
     );
 
-    // The plugin's Fluent bundle does not resolve in this dialog. Leaving
-    // data-l10n-id on elements blanked the checkbox label and leaked
-    // concatenated ids ("confirm.SourceDestinationfilestotal") into the text
-    // layer, visible via macOS force-touch lookup. All text is set from script.
+    // The plugin's Fluent bundle does not resolve in this dialog, and leaving
+    // data-l10n-id on elements leaked concatenated ids into the text layer,
+    // visible via macOS force-touch lookup. All text is set from script.
     expect(dialog).not.toMatch(/data-l10n-id=/);
     expect(dialog).not.toContain('rel="localization"');
-    expect(script).toContain('byId("apply-all").setAttribute("label"');
+    expect(script).toContain('byId("apply-all-replace").setAttribute("label"');
   });
 
   it("keeps long paths from widening the window", async () => {

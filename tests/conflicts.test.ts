@@ -4,6 +4,7 @@ import {
   allConflictsResolved,
   applyConflictChoice,
   makeUniqueName,
+  setAllConflicts,
 } from "../src/core/conflicts";
 import type { PlannedFile } from "../src/core/planner";
 
@@ -25,23 +26,35 @@ function conflict(path: string, replaceAllowed: boolean): PlannedFile {
 }
 
 describe("applyConflictChoice", () => {
-  it("applies a choice only to the selected conflict when apply-all is off", () => {
-    const result = applyConflictChoice([conflict("a.pdf", true), conflict("b.pdf", true)], 0, "ignore", false);
+  it("applies a choice only to the selected conflict", () => {
+    const result = applyConflictChoice([conflict("a.pdf", true), conflict("b.pdf", true)], 0, "ignore");
 
     expect(result.map((file) => file.conflictAction)).toEqual(["ignore", "unresolved"]);
     expect(allConflictsResolved(result)).toBe(false);
   });
 
-  it("applies a choice to remaining conflicts only for the current plan", () => {
-    const original = [conflict("a.pdf", true), conflict("b.pdf", true)];
-    const result = applyConflictChoice(original, 0, "keep-both", true);
+  it("refuses replace on a conflict whose existing attachment has annotations", () => {
+    const result = applyConflictChoice([conflict("a.pdf", false)], 0, "replace");
 
-    expect(result.map((file) => file.conflictAction)).toEqual(["keep-both", "keep-both"]);
+    expect(result[0].conflictAction).toBe("unresolved");
+  });
+});
+
+describe("setAllConflicts", () => {
+  it("applies to every conflict, not only the undecided ones", () => {
+    const original = [conflict("a.pdf", true), conflict("b.pdf", true)];
+    const once = setAllConflicts(original, "ignore");
+
+    // The old apply-to-remaining checkbox only touched unresolved rows, so a
+    // second use silently did nothing and changing your mind was impossible.
+    const twice = setAllConflicts(once, "keep-both");
+
+    expect(twice.map((file) => file.conflictAction)).toEqual(["keep-both", "keep-both"]);
     expect(original.map((file) => file.conflictAction)).toEqual(["unresolved", "unresolved"]);
   });
 
-  it("does not apply replace to conflicts whose existing attachment has annotations", () => {
-    const result = applyConflictChoice([conflict("a.pdf", true), conflict("b.pdf", false)], 0, "replace", true);
+  it("leaves annotation-protected conflicts untouched when setting replace", () => {
+    const result = setAllConflicts([conflict("a.pdf", true), conflict("b.pdf", false)], "replace");
 
     expect(result.map((file) => file.conflictAction)).toEqual(["replace", "unresolved"]);
   });

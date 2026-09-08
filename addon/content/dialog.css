@@ -61,6 +61,8 @@
 
 #conflict-toolbar { margin-bottom: 16px; }
 #conflict-hint { font-weight: 400; color: GrayText; margin-bottom: 8px; }
+#apply-all-label { color: GrayText; margin-right: 8px; }
+button.bulk { margin-right: 6px; }
 
 /* ---- file table ---- */
 

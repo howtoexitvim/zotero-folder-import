@@ -9,22 +9,38 @@ import { normalizeName } from "./planner";
 type ResolvedAction = Exclude<ConflictAction, "unresolved">;
 
 /**
- * Records a conflict choice, optionally spreading it to conflicts the user has
- * not decided yet. Replace is refused where it is not allowed (the existing
- * attachment carries annotations, or several share the filename), so a bulk
- * apply can never destroy annotated files.
+ * Records the choice for one conflicting file.
  */
 export function applyConflictChoice(
   files: PlannedFile[],
   selectedIndex: number,
   action: ResolvedAction,
-  applyAll: boolean,
 ): PlannedFile[] {
   return files.map((file, index) => {
+    if (file.classification !== "conflict" || index !== selectedIndex) return file;
+    if (action === "replace" && !file.replaceAllowed) return file;
+    return { ...file, conflictAction: action };
+  });
+}
+
+/**
+ * Sets every conflict to one action, including ones already decided.
+ *
+ * This replaces an earlier "apply my next choice to the remaining conflicts"
+ * checkbox, which only ever affected files still marked unresolved: using it a
+ * second time silently did nothing, and changing your mind was impossible.
+ * Applying to all conflicts unconditionally is idempotent and repeatable.
+ *
+ * Replace is still refused where it is not allowed (the existing attachment
+ * carries annotations, or several share the filename), so a bulk action can
+ * never destroy annotated files; those rows keep whatever they had.
+ */
+export function setAllConflicts(
+  files: PlannedFile[],
+  action: ResolvedAction,
+): PlannedFile[] {
+  return files.map((file) => {
     if (file.classification !== "conflict") return file;
-    const selected = index === selectedIndex;
-    const remaining = applyAll && file.conflictAction === "unresolved";
-    if (!selected && !remaining) return file;
     if (action === "replace" && !file.replaceAllowed) return file;
     return { ...file, conflictAction: action };
   });

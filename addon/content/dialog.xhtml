@@ -64,9 +64,19 @@
           not resolve here, and DOM localization then blanks a checkbox's label
           and concatenates unresolved ids into the text layer.
         -->
+        <!--
+          A "set all to X" bar rather than a sticky "apply my next choice to
+          the rest" checkbox: it is idempotent, works however many times it is
+          used, and never depends on hidden state from an earlier click.
+        -->
         <vbox id="conflict-toolbar" class="group" hidden="true">
           <label id="conflict-hint" class="group-title" />
-          <checkbox id="apply-all" />
+          <hbox align="center">
+            <label id="apply-all-label" />
+            <button id="apply-all-replace" class="bulk" />
+            <button id="apply-all-keep-both" class="bulk" />
+            <button id="apply-all-ignore" class="bulk" />
+          </hbox>
         </vbox>
 
         <hbox class="thead">

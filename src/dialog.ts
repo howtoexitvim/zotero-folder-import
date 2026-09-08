@@ -7,7 +7,7 @@
  * "command" rather than "click". Text is set from the words table below because
  * a plugin's Fluent bundle does not resolve in this window.
  */
-import { allConflictsResolved, applyConflictChoice } from "./core/conflicts";
+import { allConflictsResolved, applyConflictChoice, setAllConflicts } from "./core/conflicts";
 import type { ImportProgress, ImportResult } from "./core/importer";
 import type { ConflictAction, ImportPlan, PlannedFile } from "./core/planner";
 
@@ -59,7 +59,10 @@ function initWords(): void {
       keepBoth: "两者都保留",
       done: "导入完成",
       failed: "失败",
-      applyAll: "对其余冲突也这样处理",
+      applyAll: "全部设为:",
+      bulkReplace: "全部替换",
+      bulkKeepBoth: "全部保留两者",
+      bulkIgnore: "全部忽略",
       conflictHint: "以下文件在目标 collection 里已有同名文件，请选择如何处理：",
       title: "检查导入",
       colSource: "来源",
@@ -95,7 +98,10 @@ function initWords(): void {
       keepBoth: "Keep Both",
       done: "Import complete",
       failed: "Failed",
-      applyAll: "Do the same for the remaining conflicts",
+      applyAll: "Set all to:",
+      bulkReplace: "Replace all",
+      bulkKeepBoth: "Keep both for all",
+      bulkIgnore: "Ignore all",
       conflictHint: "These files already exist under the same name in the target collection. Choose what to do:",
       title: "Review import",
       colSource: "Source",
@@ -228,7 +234,14 @@ function renderSummary(): void {
   setHidden(byId("conflict-toolbar"), !hasConflicts);
   setHidden(byId("head-action"), !hasConflicts);
   setText(byId("conflict-hint"), words.conflictHint);
-  byId("apply-all").setAttribute("label", words.applyAll);
+  setText(byId("apply-all-label"), words.applyAll);
+  byId("apply-all-replace").setAttribute("label", words.bulkReplace);
+  byId("apply-all-keep-both").setAttribute("label", words.bulkKeepBoth);
+  byId("apply-all-ignore").setAttribute("label", words.bulkIgnore);
+  // Replace is unavailable when every conflict is annotation-protected.
+  const anyReplaceable = files.some((file) =>
+    file.classification === "conflict" && file.replaceAllowed);
+  setHidden(byId("apply-all-replace"), !anyReplaceable);
   setText(byId("count-total"), String(data.plan.summary.total));
   setText(byId("count-size"), formatBytes(data.plan.summary.bytes));
   setText(byId("count-new"), String(data.plan.summary.new));
@@ -303,12 +316,7 @@ function renderFiles(): void {
     menulist.addEventListener("command", () => {
       const action = (menulist as any).value as ConflictAction;
       if (action === "unresolved") return;
-      files = applyConflictChoice(
-        files,
-        index,
-        action,
-        (byId("apply-all") as any).checked,
-      );
+      files = applyConflictChoice(files, index, action);
       renderFiles();
       updateImportButton();
     });
@@ -457,6 +465,17 @@ function render(): void {
     renderSummary();
     renderFiles();
     updateImportButton();
+    for (const [id, action] of [
+      ["apply-all-replace", "replace"],
+      ["apply-all-keep-both", "keep-both"],
+      ["apply-all-ignore", "ignore"],
+    ] as const) {
+      byId(id).addEventListener("command", () => {
+        files = setAllConflicts(files, action);
+        renderFiles();
+        updateImportButton();
+      });
+    }
     resizeToContent();
     byId("cancel-button").addEventListener("command", () => {
       if (!importing) {
