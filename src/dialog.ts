@@ -43,6 +43,7 @@ function initWords(): void {
       keepBoth: "两者都保留",
       done: "导入完成",
       failed: "失败",
+      applyAll: "将此选择应用到其余冲突",
     }
     : {
       new: "New",
@@ -55,6 +56,7 @@ function initWords(): void {
       keepBoth: "Keep Both",
       done: "Import complete",
       failed: "Failed",
+      applyAll: "Apply this choice to all remaining conflicts",
     };
 }
 
@@ -112,6 +114,13 @@ function setText(element: Element, text: string): void {
   element.setAttribute("value", text);
 }
 
+// Long paths are cropped in the middle by the label; keep the full text on the
+// tooltip so nothing is actually lost.
+function setPath(element: Element, text: string): void {
+  element.setAttribute("value", text);
+  element.setAttribute("tooltiptext", text);
+}
+
 function appendCell(row: Element, text: string, className?: string): Element {
   const cell = xul("label");
   cell.setAttribute("value", text);
@@ -130,8 +139,9 @@ function appendListItem(list: Element, text: string): void {
 }
 
 function renderSummary(): void {
-  setText(byId("source-path"), data.sourcePath);
-  setText(byId("destination-path"), data.destinationPath);
+  setPath(byId("source-path"), data.sourcePath);
+  setPath(byId("destination-path"), data.destinationPath);
+  byId("apply-all").setAttribute("label", words.applyAll);
   setText(byId("count-total"), String(data.plan.summary.total));
   setText(byId("count-size"), formatBytes(data.plan.summary.bytes));
   setText(byId("count-new"), String(data.plan.summary.new));
@@ -164,7 +174,9 @@ function renderFiles(): void {
     const row = xul("hbox");
     row.setAttribute("class", "trow");
     row.setAttribute("align", "center");
-    appendCell(row, file.relativePath, "col-file");
+    const fileCell = appendCell(row, file.relativePath, "col-file");
+    fileCell.setAttribute("crop", "center");
+    fileCell.setAttribute("tooltiptext", file.relativePath);
     appendCell(row, file.extension.toUpperCase(), "col-type");
     appendCell(row, formatBytes(file.size), "col-size");
     const status = file.classification === "new"

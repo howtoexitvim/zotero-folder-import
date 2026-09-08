@@ -75,6 +75,41 @@ describe("Zotero install manifest", () => {
     expect(code).toContain("createElementNS(HTML_NS");
   });
 
+  it("labels the checkbox from script, not data-l10n-id", async () => {
+    const dialog = await readFile(
+      new URL("../addon/content/dialog.xhtml", import.meta.url),
+      "utf8",
+    );
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
+
+    // DOM localization clears a XUL checkbox's built-in label before the
+    // plugin bundle resolves, so the box rendered with no text at all.
+    const checkbox = dialog.match(/<checkbox[^>]*>/)?.[0] ?? "";
+    expect(checkbox).not.toContain("data-l10n-id");
+    expect(checkbox).toContain("label=");
+    expect(script).toContain('byId("apply-all").setAttribute("label"');
+  });
+
+  it("keeps long paths from widening the window", async () => {
+    const dialog = await readFile(
+      new URL("../addon/content/dialog.xhtml", import.meta.url),
+      "utf8",
+    );
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
+
+    // Each path is its own flexible row that crops in the middle, with the
+    // full value kept on the tooltip.
+    expect(dialog).toMatch(/id="source-path"[^>]*crop="center"/);
+    expect(dialog).toMatch(/id="destination-path"[^>]*crop="center"/);
+    expect(script).toContain('setAttribute("tooltiptext", text)');
+  });
+
   it("references Fluent files by bare filename", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),

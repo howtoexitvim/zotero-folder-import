@@ -16,7 +16,11 @@
 .subtitle { color: GrayText; margin-bottom: 12px; }
 
 .paths { margin: 14px 0; }
-.path-label { font-weight: 600; margin-right: 14px; }
+.path-row { margin-bottom: 4px; }
+/* Fixed-width caption so both paths start at the same x, and the value takes
+   the rest of the row and crops rather than widening the window. */
+.path-label { font-weight: 600; width: 92px; }
+.path-value { color: FieldText; }
 
 
 
@@ -50,7 +54,7 @@
 }
 
 .thead { font-weight: 600; padding-top: 10px; }
-.col-file   { width: 420px; }
+.col-file   { flex: 1; min-width: 240px; }
 .col-type   { width: 70px; }
 .col-size   { width: 100px; }
 .col-status { width: 110px; }

@@ -27,22 +27,21 @@
         <label id="preview-title" class="heading" data-l10n-id="folder-import-preview-title" value="Review import" />
         <label id="preview-subtitle" class="subtitle" data-l10n-id="folder-import-preview-description" value="Nothing is written until you confirm." />
 
-        <grid class="paths">
-          <columns>
-            <column />
-            <column flex="1" />
-          </columns>
-          <rows>
-            <row align="center">
-              <label class="path-label" data-l10n-id="folder-import-source" value="Source" />
-              <label id="source-path" crop="center" flex="1" />
-            </row>
-            <row align="center">
-              <label class="path-label" data-l10n-id="folder-import-destination" value="Destination" />
-              <label id="destination-path" crop="center" flex="1" />
-            </row>
-          </rows>
-        </grid>
+        <!--
+          Each path gets its own full-width row and crops in the middle, so a
+          long path ellipsizes instead of stretching the window. The full text
+          is on the tooltip.
+        -->
+        <vbox class="paths">
+          <hbox class="path-row" align="center">
+            <label class="path-label" data-l10n-id="folder-import-source" value="Source" />
+            <label id="source-path" class="path-value" crop="center" flex="1" />
+          </hbox>
+          <hbox class="path-row" align="center">
+            <label class="path-label" data-l10n-id="folder-import-destination" value="Destination" />
+            <label id="destination-path" class="path-value" crop="center" flex="1" />
+          </hbox>
+        </vbox>
 
         <hbox class="metrics" align="center">
           <vbox class="metric"><label id="count-total" class="num" value="0" /><label data-l10n-id="folder-import-files" value="files" /></vbox>
@@ -65,7 +64,12 @@
         </vbox>
 
         <hbox class="conflict-toolbar" align="center">
-          <checkbox id="apply-all" data-l10n-id="folder-import-apply-all" label="Apply this choice to all remaining conflicts" />
+          <!--
+            No data-l10n-id here: DOM localization clears a checkbox's built-in
+            label before the plugin bundle resolves, leaving an unlabelled box.
+            The label is set from script instead, like the menu item.
+          -->
+          <checkbox id="apply-all" label="Apply this choice to all remaining conflicts" />
         </hbox>
 
         <hbox class="thead">
