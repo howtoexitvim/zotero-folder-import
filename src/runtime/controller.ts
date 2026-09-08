@@ -31,16 +31,42 @@ function collectionPath(collection: any): string {
   return parts.join(" / ");
 }
 
-function selectedRows(window: any): SelectedRow[] {
-  // Zotero 10 removed the singular accessor (it now throws). The plural form
-  // returns only the selected rows (collectionsView.selection.selected), which
-  // is already what we want. Multi-select means it can hold more than one.
-  return window.ZoteroPane.getCollectionTreeRows().map((row: any) => ({
+/** Maps a Zotero collection-tree row onto the shape destination.ts expects. */
+function toSelectedRow(row: any): SelectedRow | undefined {
+  if (!row) return undefined;
+  return {
     type: row.type,
     libraryID: row.ref?.libraryID,
     collectionID: row.isCollection?.() ? row.ref.id : undefined,
     collectionPath: row.isCollection?.() ? collectionPath(row.ref) : undefined,
-  }));
+  };
+}
+
+/**
+ * The row a context menu was opened on. Zotero exposes it as a getter that can
+ * throw, so it is read defensively.
+ */
+function contextRow(context: any): SelectedRow | undefined {
+  try {
+    return toSelectedRow(context?.collectionTreeRow);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The selected row, or undefined unless exactly one row is selected. */
+function singleSelectedRow(window: any): SelectedRow | undefined {
+  const rows = selectedRows(window);
+  return rows.length === 1 ? rows[0] : undefined;
+}
+
+function selectedRows(window: any): SelectedRow[] {
+  // Zotero 10 removed the singular accessor (it now throws). The plural form
+  // returns only the selected rows (collectionsView.selection.selected), which
+  // is already what we want. Multi-select means it can hold more than one.
+  return window.ZoteroPane.getCollectionTreeRows()
+    .map(toSelectedRow)
+    .filter(Boolean) as SelectedRow[];
 }
 
 /** Trailing folder name of a path, used as the top collection to create. */
@@ -72,7 +98,7 @@ function menuLabel(): string {
 }
 
 export class FolderImportController {
-  private registeredMenuID?: string;
+  private readonly registeredMenuIDs: string[] = [];
   private chromeHandle?: { destruct(): void };
 
   constructor(
@@ -94,45 +120,61 @@ export class FolderImportController {
     ]);
   }
 
-  /** Registers the chrome package and the File menu entry. */
-  register(): void {
-    this.registerChrome();
-    const menuID = Zotero.MenuManager.registerMenu({
-      menuID: "folder-import-main-file-menu",
-      pluginID: this.pluginID,
-      target: "main/menubar/file",
-      menus: [{
-        menuType: "menuitem",
-        enableForTabTypes: ["library"],
-        onShowing: (event: any, context: any) => {
-          const menuElem = context?.menuElem;
-          if (!menuElem) return;
-          menuElem.setAttribute("label", menuLabel());
-          // Only My Library and real collections can receive files. Views like
-          // My Publications, Duplicate Items, Unfiled Items and Trash list
-          // existing items and are not import targets, so hide the entry there
-          // rather than silently falling back to the library root.
-          const window = event?.target?.ownerGlobal ?? menuElem.ownerGlobal;
-          menuElem.hidden = !this.canImportHere(window);
-        },
-        onCommand: (event: any) => {
-          const window = event.target.ownerGlobal;
-          void this.run(window).catch((error) => {
-            Zotero.logError(error);
-            Services.prompt.alert(window, "Folder Import", error instanceof Error ? error.message : String(error));
-          });
-        },
-      }],
-    });
-    if (!menuID) throw new Error("Unable to register Folder Import menu");
-    this.registeredMenuID = menuID;
+  /**
+   * One menu entry definition, used for both the File menu and the
+   * right-click menu on a collection or My Library.
+   */
+  private menuDefinition() {
+    return {
+      menuType: "menuitem" as const,
+      enableForTabTypes: ["library"],
+      onShowing: (event: any, context: any) => {
+        const menuElem = context?.menuElem;
+        if (!menuElem) return;
+        menuElem.setAttribute("label", menuLabel());
+        // Only My Library and real collections can receive files. Views like
+        // My Publications, Duplicate Items, Unfiled Items and Trash list
+        // existing items and are not import targets, so hide the entry there
+        // rather than silently falling back to the library root.
+        const window = event?.target?.ownerGlobal ?? menuElem.ownerGlobal;
+        menuElem.hidden = !this.canImportHere(window, context);
+      },
+      onCommand: (event: any, context: any) => {
+        const window = event.target.ownerGlobal;
+        void this.run(window, contextRow(context)).catch((error) => {
+          Zotero.logError(error);
+          Services.prompt.alert(window, "Folder Import", error instanceof Error ? error.message : String(error));
+        });
+      },
+    };
   }
 
-  /** True when the current collections-pane selection can receive an import. */
-  private canImportHere(window: any): boolean {
+  /** Registers the chrome package and both menu entries. */
+  register(): void {
+    this.registerChrome();
+    for (const [menuID, target] of [
+      ["folder-import-main-file-menu", "main/menubar/file"],
+      ["folder-import-collection-context-menu", "main/library/collection"],
+    ] as const) {
+      const registered = Zotero.MenuManager.registerMenu({
+        menuID,
+        pluginID: this.pluginID,
+        target,
+        menus: [this.menuDefinition()],
+      });
+      if (!registered) throw new Error(`Unable to register Folder Import menu ${menuID}`);
+      this.registeredMenuIDs.push(registered);
+    }
+  }
+
+  /**
+   * True when the row this menu applies to can receive an import: the
+   * right-clicked row for a context menu, otherwise the pane selection.
+   */
+  private canImportHere(window: any, context?: any): boolean {
     try {
-      const rows = selectedRows(window);
-      return rows.length === 1 && canImportInto(rows[0], Zotero.Libraries.userLibraryID);
+      const row = contextRow(context) ?? singleSelectedRow(window);
+      return canImportInto(row, Zotero.Libraries.userLibraryID);
     } catch (error) {
       Zotero.debug(`[Folder Import] selection check failed: ${error}`);
       return false;
@@ -141,8 +183,9 @@ export class FolderImportController {
 
   /** Removes the menu entry and releases the chrome registration. */
   unregister(): void {
-    if (this.registeredMenuID) Zotero.MenuManager.unregisterMenu(this.registeredMenuID);
-    this.registeredMenuID = undefined;
+    for (const menuID of this.registeredMenuIDs.splice(0)) {
+      Zotero.MenuManager.unregisterMenu(menuID);
+    }
     this.chromeHandle?.destruct();
     this.chromeHandle = undefined;
   }
@@ -160,11 +203,11 @@ export class FolderImportController {
    * Scans the chosen folder, builds an import plan, and opens the preview
    * dialog. Nothing is written to the library until the user confirms there.
    */
-  async run(window: any): Promise<void> {
-    const destination = resolveDestination(
-      selectedRows(window),
-      Zotero.Libraries.userLibraryID,
-    );
+  async run(window: any, targetRow?: SelectedRow): Promise<void> {
+    // A right-click acts on the row under the cursor, which is not necessarily
+    // the pane selection; the File menu has no such row and uses the selection.
+    const rows = targetRow ? [targetRow] : selectedRows(window);
+    const destination = resolveDestination(rows, Zotero.Libraries.userLibraryID);
     const sourcePath = await this.chooseFolder(window);
     if (!sourcePath) return;
 

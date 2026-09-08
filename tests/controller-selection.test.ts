@@ -64,7 +64,31 @@ describe("menu visibility", () => {
     // The entry used to show on My Publications, Duplicate Items, Unfiled
     // Items and Trash, where the destination silently became the library root.
     expect(controller).toContain("canImportHere");
-    expect(controller).toContain("menuElem.hidden = !this.canImportHere(window)");
+    expect(controller).toContain("menuElem.hidden = !this.canImportHere(window, context)");
+  });
+
+  it("registers the collection context menu alongside the File menu", async () => {
+    const controller = await controllerSource;
+
+    // Right-clicking a collection or My Library should offer the same import.
+    expect(controller).toContain('"main/menubar/file"');
+    expect(controller).toContain('"main/library/collection"');
+    // Both share one definition, so gating and labelling cannot drift apart.
+    expect(controller).toContain("this.menuDefinition()");
+  });
+
+  it("imports into the right-clicked row, not the pane selection", async () => {
+    const controller = await controllerSource;
+
+    // A context menu can be opened on a row that is not selected.
+    expect(controller).toContain("contextRow(context)");
+    expect(controller).toContain("targetRow ? [targetRow] : selectedRows(window)");
+  });
+
+  it("unregisters every menu it registered", async () => {
+    const controller = await controllerSource;
+
+    expect(controller).toContain("this.registeredMenuIDs.splice(0)");
   });
 });
 
