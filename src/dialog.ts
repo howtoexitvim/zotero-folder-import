@@ -74,7 +74,18 @@ function xul(tag: string): Element {
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
-  if (!element) throw new Error(`Missing dialog element ${id}`);
+  if (!element) {
+    // Report what the DOM actually contains, so a missing element says why
+    // rather than just which id failed.
+    const root = document.documentElement;
+    const ids = Array.from(root.querySelectorAll("[id]")).map((e) => e.id);
+    throw new Error(
+      `Missing dialog element ${id}\n`
+      + `documentElement: <${root.nodeName}> children=${root.children.length}\n`
+      + `ids present (${ids.length}): ${ids.join(", ") || "(none)"}\n`
+      + `readyState=${document.readyState}`,
+    );
+  }
   return element as T;
 }
 
@@ -280,7 +291,7 @@ function reportFatal(error: unknown): void {
   root.replaceChildren(pre, close);
 }
 
-function init(): void {
+function render(): void {
   try {
     data = readDialogData();
     files = data.plan.files.map((file) => ({ ...file }));
@@ -297,6 +308,34 @@ function init(): void {
   }
 }
 
+function init(): void {
+  // onload can fire before the parser has finished building the window's
+  // children, in which case getElementById finds nothing. Wait for the last
+  // element in the markup to exist before rendering.
+  if (document.getElementById("close-button")) {
+    render();
+    return;
+  }
+  let attempts = 0;
+  const timer = window.setInterval(() => {
+    attempts += 1;
+    if (document.getElementById("close-button")) {
+      window.clearInterval(timer);
+      render();
+    } else if (attempts > 100) {
+      window.clearInterval(timer);
+      render(); // let byId report the real DOM state
+    }
+  }, 10);
+}
+
+// loadSubScript runs this with the window as its scope object, so publish the
+// entry point on both that scope and the window itself; the onload attribute
+// resolves against the window.
 // The XUL <window> calls FolderImportDialog.init() from its onload attribute,
 // matching how Zotero's own dialogs bootstrap.
-Object.assign(globalThis, { FolderImportDialog: { init } });
+const entryPoint = { init };
+Object.assign(globalThis, { FolderImportDialog: entryPoint });
+if (typeof window !== "undefined") {
+  (window as any).FolderImportDialog = entryPoint;
+}

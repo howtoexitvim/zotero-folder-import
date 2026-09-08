@@ -12,7 +12,14 @@
   <linkset>
     <html:link rel="localization" href="folder-import.ftl" />
   </linkset>
-  <script src="chrome://folder-import/content/dialog.js" />
+  <!--
+    Zotero's own dialogs load their page script with loadSubScript into the
+    window scope rather than <script src=>, which is what makes the resulting
+    globals visible to the onload attribute.
+  -->
+  <script>
+    Services.scriptloader.loadSubScript("chrome://folder-import/content/dialog.js", this);
+  </script>
 
   <!--
     Zotero's own dialogs only ever use html:div, html:span, html:input,
