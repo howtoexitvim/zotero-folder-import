@@ -1,8 +1,8 @@
 /**
  * Turns a folder scan plus the current library contents into an import plan:
- * which collections to create, and for each file whether it is new, already in
- * the library, or clashes with an existing attachment. Pure -- it reads no
- * Zotero state itself, so the whole preview is testable.
+ * which collections to create, and for each file whether it is new or clashes
+ * with a same-named attachment in the destination. Pure -- it reads no Zotero
+ * state itself, so the whole preview is testable.
  */
 import type { SourceFile } from "./scanner";
 
@@ -14,7 +14,6 @@ export type ConflictAction = "replace" | "ignore" | "keep-both" | "unresolved";
 /** A collection already present in the library. */
 export interface ExistingCollection {
   id: number;
-  libraryID: number;
   parentID?: number | false;
   name: string;
 }

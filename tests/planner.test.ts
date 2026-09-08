@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildImportPlan, normalizeName } from "../src/core/planner";
 import type { SourceFile } from "../src/core/scanner";
 
-function source(relativePath: string, _md5 = "", size = 10): SourceFile {
+function source(relativePath: string, size = 10): SourceFile {
   const name = relativePath.split("/").at(-1)!;
   return {
     absolutePath: `/source/${relativePath}`,
@@ -20,10 +20,10 @@ describe("buildImportPlan", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
       baseCollectionID: 5,
-      files: [source("Best/Sub/Paper.pdf", "aaa")],
+      files: [source("Best/Sub/Paper.pdf")],
       collections: [
-        { id: 10, libraryID: 1, parentID: 5, name: "award_papers" },
-        { id: 11, libraryID: 1, parentID: 10, name: "Best" },
+        { id: 10, parentID: 5, name: "award_papers" },
+        { id: 11, parentID: 10, name: "Best" },
       ],
       attachments: [],
     });
@@ -41,8 +41,8 @@ describe("buildImportPlan", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
       baseCollectionID: 5,
-      files: [source("Paper.pdf", "same")],
-      collections: [{ id: 10, libraryID: 1, parentID: 5, name: "Award_Papers" }],
+      files: [source("Paper.pdf")],
+      collections: [{ id: 10, parentID: 5, name: "Award_Papers" }],
       attachments: [
         {
           id: 90,
@@ -65,8 +65,8 @@ describe("buildImportPlan", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
       baseCollectionID: 5,
-      files: [source("Paper.pdf", "new")],
-      collections: [{ id: 10, libraryID: 1, parentID: 5, name: "Award_Papers" }],
+      files: [source("Paper.pdf")],
+      collections: [{ id: 10, parentID: 5, name: "Award_Papers" }],
       attachments: [
         {
           id: 90,
@@ -88,8 +88,8 @@ describe("buildImportPlan", () => {
   it("disables bulk replacement when multiple existing attachments share the name", () => {
     const plan = buildImportPlan({
       rootName: "Root",
-      files: [source("Paper.pdf", "new")],
-      collections: [{ id: 10, libraryID: 1, name: "Root" }],
+      files: [source("Paper.pdf")],
+      collections: [{ id: 10, name: "Root" }],
       attachments: [
         { id: 1, name: "paper.pdf", collectionIDs: [10], hasAnnotations: false },
         { id: 2, name: "PAPER.PDF", collectionIDs: [10], hasAnnotations: false },
@@ -103,8 +103,8 @@ describe("buildImportPlan", () => {
     const plan = buildImportPlan({
       rootName: "Award_Papers",
       baseCollectionID: 5,
-      files: [source("Renamed.pdf", "new")],
-      collections: [{ id: 10, libraryID: 1, parentID: 5, name: "Award_Papers" }],
+      files: [source("Renamed.pdf")],
+      collections: [{ id: 10, parentID: 5, name: "Award_Papers" }],
       attachments: [
         {
           id: 90,
@@ -121,7 +121,7 @@ describe("buildImportPlan", () => {
   it("imports the same file into two source folders as two independent copies", () => {
     const plan = buildImportPlan({
       rootName: "Root",
-      files: [source("a/paper.pdf", "same"), source("b/paper.pdf", "same")],
+      files: [source("a/paper.pdf"), source("b/paper.pdf")],
       collections: [],
       attachments: [],
     });
@@ -135,7 +135,7 @@ describe("buildImportPlan", () => {
   it("keeps same-content files separate when their source filenames differ", () => {
     const plan = buildImportPlan({
       rootName: "Root",
-      files: [source("a.pdf", "same"), source("b.pdf", "same")],
+      files: [source("a.pdf"), source("b.pdf")],
       collections: [],
       attachments: [],
     });

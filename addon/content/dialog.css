@@ -28,7 +28,6 @@
 
 .heading { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
 .group-title { font-weight: 600; margin-bottom: 6px; }
-.muted { color: GrayText; }
 
 /* ---- source / destination ---- */
 
@@ -84,11 +83,9 @@ button.bulk { margin-right: 6px; }
 .col-action { width: 220px; }
 
 .status-new { color: #1a7f37; }
-.status-reused { color: #0969da; }
 .status-conflict { color: #9a6700; }
 
 menulist { max-width: 210px; }
-checkbox { margin: 0; }
 
 /* ---- progress view ---- */
 

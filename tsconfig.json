@@ -6,8 +6,20 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"],
-    "lib": ["ES2022", "DOM"]
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.mjs"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs"
+  ]
 }

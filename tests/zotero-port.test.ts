@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getExistingAttachments, ZoteroImportPort } from "../src/runtime/zotero-port";
-import type { SourceFile } from "../src/core/scanner";
 
 const savedGlobals = {
   Zotero: (globalThis as any).Zotero,
@@ -14,18 +13,7 @@ afterEach(() => {
   Object.assign(globalThis as any, savedGlobals);
 });
 
-function source(): SourceFile {
-  return {
-    absolutePath: "/source/paper.pdf",
-    relativePath: "paper.pdf",
-    name: "paper.pdf",
-    extension: "pdf",
-    size: 10,
-    mtime: 100,
-  };
-}
-
-function attachment(id: number, path: string, size: number, hash: string | Error) {
+function attachment(id: number, path: string) {
   let childItemsLoaded = false;
   let collectionsLoaded = false;
   return {
@@ -33,13 +21,8 @@ function attachment(id: number, path: string, size: number, hash: string | Error
     libraryID: 1,
     parentID: false,
     attachmentContentType: "application/pdf",
-    attachmentSyncedHash: null,
-    attachmentSyncedModificationTime: null,
     isStoredFileAttachment: () => true,
     getFilePathAsync: async () => path,
-    get attachmentHash() {
-      return hash instanceof Error ? Promise.reject(hash) : Promise.resolve(hash);
-    },
     getAnnotations() {
       if (!childItemsLoaded) throw new Error("childItems not loaded");
       return [];
@@ -52,14 +35,13 @@ function attachment(id: number, path: string, size: number, hash: string | Error
       childItemsLoaded ||= types.includes("childItems");
       collectionsLoaded ||= types.includes("collections");
     },
-    size,
   };
 }
 
 describe("getExistingAttachments", () => {
   it("loads names and collections without reading any file content", async () => {
-    const first = attachment(1, "/storage/paper.pdf", 10, "unused");
-    const second = attachment(2, "/storage/other.pdf", 20, "unused");
+    const first = attachment(1, "/storage/paper.pdf");
+    const second = attachment(2, "/storage/other.pdf");
     const items = [first, second];
     let statCalls = 0;
     (globalThis as any).PathUtils = { filename: (path: string) => path.split("/").at(-1)! };
@@ -89,7 +71,7 @@ describe("getExistingAttachments", () => {
 
 describe("ZoteroImportPort", () => {
   it("loads annotation data before runtime Replace safety checks", async () => {
-    const item = attachment(3, "/storage/paper.pdf", 10, "hash");
+    const item = attachment(3, "/storage/paper.pdf");
     (globalThis as any).Zotero = {
       Items: {
         getAsync: async () => item,

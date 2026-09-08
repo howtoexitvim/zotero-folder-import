@@ -171,7 +171,7 @@ describe("executeImport", () => {
     expect(events.some((event) => event.startsWith("import:"))).toBe(false);
   });
 
-  it("imports repeated source content once and links it to later target collections", async () => {
+  it("imports the same file from two source folders as two attachments", async () => {
     const { port, events } = fakePort();
     const input = plan([
       planned(),
@@ -268,5 +268,26 @@ describe("cancellation", () => {
     expect(result.cancelled).toBeFalsy();
     expect(result.imported).toBe(3);
     expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(3);
+  });
+});
+
+describe("filename bookkeeping during a run", () => {
+  it("frees a replaced name and records the new one, so Keep Both stays accurate", async () => {
+    const { port, events } = fakePort();
+    const input = plan([
+      planned({
+        classification: "conflict",
+        conflictAction: "replace",
+        existingAttachmentIDs: [9],
+        replaceAllowed: true,
+      }),
+    ]);
+
+    await executeImport(input, port);
+
+    // The replacement is filed under a parent item, so importStored gets no
+    // collectionID; targetCollectionID is what keeps the name table correct.
+    expect(events).toContain("trash:9");
+    expect(events.some((event) => event.startsWith("import:"))).toBe(true);
   });
 });

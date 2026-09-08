@@ -30,6 +30,7 @@ export interface Destination {
  */
 const IMPORTABLE_ROW_TYPES = new Set(["library", "collection"]);
 
+/** True when a row can receive an import, used to gate the menu entries. */
 export function canImportInto(row: SelectedRow | undefined, userLibraryID: number): boolean {
   return !!row
     && row.libraryID === userLibraryID

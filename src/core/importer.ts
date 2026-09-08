@@ -17,8 +17,11 @@ export interface AttachmentContext {
 export interface ImportStoredRequest {
   path: string;
   name: string;
+  /** Collection to file into directly; unset when filing under a parent item. */
   collectionID?: number;
   parentItemID?: number;
+  /** Collection the file ends up in, for name bookkeeping on the Replace path. */
+  targetCollectionID?: number;
 }
 
 /** Library operations the importer needs; backed by Zotero at runtime. */
@@ -27,7 +30,7 @@ export interface ImportPort {
   ensureCollection(baseCollectionID: number | undefined, segments: string[]): Promise<number>;
   getAttachmentContext(id: number): Promise<AttachmentContext>;
   importStored(request: ImportStoredRequest): Promise<number>;
-  trashAttachments(ids: number[]): Promise<void>;
+  trashAttachments(ids: number[], collectionID?: number, names?: string[]): Promise<void>;
   occupiedNames(collectionID: number): Promise<string[]>;
   indexAttachments(ids: number[]): Promise<void>;
 }
@@ -56,7 +59,6 @@ export interface ImportProgress {
   completed: number;
   total: number;
   path: string;
-  result: ImportResult;
 }
 
 /** Zeroed tally to accumulate into. */
@@ -166,8 +168,9 @@ export async function executeImport(
           name: file.name,
           collectionID: parentID ? undefined : collectionID,
           parentItemID: parentID || undefined,
+          targetCollectionID: collectionID,
         });
-        await port.trashAttachments(file.existingAttachmentIDs);
+        await port.trashAttachments(file.existingAttachmentIDs, collectionID, [file.name]);
         result.importedAttachmentIDs.push(attachmentID);
         result.replaced += 1;
       }
@@ -179,7 +182,7 @@ export async function executeImport(
       });
     } finally {
       try {
-        onProgress?.({ completed: index + 1, total: plan.files.length, path: file.relativePath, result });
+        onProgress?.({ completed: index + 1, total: plan.files.length, path: file.relativePath });
       } catch {
         // Progress UI is advisory. Closing or tearing down the dialog must not stop imports.
       }

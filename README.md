@@ -17,10 +17,10 @@ npm run verify
 ## Architecture
 
 - `src/core/`: filesystem-independent scanner, destination resolver, import planner, conflict policy, and ordered executor.
-- `src/runtime/`: Zotero 10 adapters for MenuManager, FilePicker, collections, stored attachments, hashing, annotations, Trash, and full-text indexing.
+- `src/runtime/`: Zotero 10 adapters for MenuManager, FilePicker, collections, stored attachments, annotations, Trash, and full-text indexing. No hashing: files are matched by name in the destination collection, so content is never read.
 - `src/dialog.ts`: preview, conflict selection, progress, and completion UI.
 - `addon/`: manifest, XUL dialog, CSS, and icon, copied to the XPI root.
-- `tests/`: behavior tests for planning and mutation ordering.
+- `tests/`: behaviour tests for planning, conflict handling and mutation ordering, plus source-text assertions pinning the XUL/chrome/menu wiring this build had to discover empirically.
 
 The executor refuses plans with unresolved conflicts. Replace imports first and trashes old attachments only after the new attachment has succeeded. Runtime annotation checks remain active even after preview.
 

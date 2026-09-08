@@ -262,7 +262,7 @@ function renderSummary(): void {
     appendListItem(collections, segments.join(" / "));
   }
   if (!data.plan.collectionsToCreate.length) {
-    appendListItem(collections, zh ? "全部复用现有 collection" : "All collections already exist");
+    appendListItem(collections, words.allExist);
   }
 }
 
@@ -393,8 +393,12 @@ function updateProgress(progress: ImportProgress): void {
 
 /** Shows the final tally and any per-file errors. */
 function renderResult(result: ImportResult): void {
-  setText(byId("progress-title"), result.cancelled ? words.cancelled : words.done);
+  // Swap Stop for Close before anything else: if painting the summary throws,
+  // the footer must still offer a working button rather than stranding the
+  // dialog with no way out.
+  setHidden(byId("close-button"), false);
   setHidden(byId("cancel-button"), true);
+  setText(byId("progress-title"), result.cancelled ? words.cancelled : words.done);
   setText(byId("result-summary"), [
     `${words.new}: ${result.imported}`,
     `${words.replace}: ${result.replaced}`,
@@ -407,7 +411,6 @@ function renderResult(result: ImportResult): void {
   for (const error of result.errors) {
     appendListItem(errors, `${error.path}: ${error.message}`);
   }
-  setHidden(byId("close-button"), false);
   resizeToContent();
 }
 
@@ -415,27 +418,45 @@ function renderResult(result: ImportResult): void {
 async function beginImport(): Promise<void> {
   if (!allConflictsResolved(files)) return;
   importing = true;
-  showProgress();
-  const actions = Object.fromEntries(
-    files
-      .filter((file) => file.classification === "conflict")
-      .map((file) => [file.relativePath, file.conflictAction!]),
-  );
   try {
-    const result = await data.onConfirm(actions, updateProgress, () => cancelRequested);
-    importing = false;
+    // Inside the try: byId() throws on a missing element, and a throw here used
+    // to leave `importing` set with the progress view never shown, which also
+    // disabled the Cancel button's close path.
+    showProgress();
+    const actions = Object.fromEntries(
+      files
+        .filter((file) => file.classification === "conflict")
+        .map((file) => [file.relativePath, file.conflictAction!]),
+    );
+    let result: ImportResult;
+    try {
+      result = await data.onConfirm(actions, updateProgress, () => cancelRequested);
+    } catch (error) {
+      // The import itself failed: still a normal outcome, so report it in the
+      // result view rather than replacing the window.
+      result = {
+        imported: 0,
+        ignored: 0,
+        replaced: 0,
+        keptBoth: 0,
+        failed: 1,
+        importedAttachmentIDs: [],
+        errors: [{
+          path: data.sourcePath,
+          message: error instanceof Error ? error.message : String(error),
+        }],
+      };
+    }
     renderResult(result);
   } catch (error) {
+    // Only reached if rendering itself threw. Calling renderResult again would
+    // throw again, so fall back to the panel that replaces the whole window and
+    // brings its own Close button.
+    reportFatal(error);
+  } finally {
+    // In finally so a throw while rendering cannot leave the dialog stuck in
+    // the importing state with Stop still armed.
     importing = false;
-    renderResult({
-      imported: 0,
-      ignored: 0,
-      replaced: 0,
-      keptBoth: 0,
-      failed: 1,
-      importedAttachmentIDs: [],
-      errors: [{ path: data.sourcePath, message: error instanceof Error ? error.message : String(error) }],
-    });
   }
 }
 

@@ -96,6 +96,10 @@ function menuLabel(): string {
   return locale.startsWith("zh") ? "导入文件夹…" : "Import Folder…";
 }
 
+/**
+ * Owns the plugin's Zotero registrations for the lifetime of the session and
+ * drives one import from menu click to finished dialog.
+ */
 export class FolderImportController {
   private readonly registeredMenuIDs: string[] = [];
   private chromeHandle?: { destruct(): void };

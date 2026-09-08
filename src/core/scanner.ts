@@ -6,6 +6,7 @@
 /** File types this plugin imports. */
 export type SupportedExtension = "pdf" | "epub";
 
+/** One entry from a directory listing. */
 export interface DirectoryEntry {
   name: string;
   path: string;
@@ -33,6 +34,7 @@ export interface SourceFile extends FileStat {
   extension: SupportedExtension;
 }
 
+/** A path that could not be read, reported in the preview rather than thrown. */
 export interface ScanError {
   path: string;
   message: string;

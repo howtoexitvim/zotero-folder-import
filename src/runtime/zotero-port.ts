@@ -5,13 +5,9 @@
  */
 import type { ImportPort, ImportStoredRequest } from "../core/importer";
 import { normalizeName, type ExistingAttachment, type ExistingCollection } from "../core/planner";
-import type { DirectoryEntry, FileStat, FileSystemPort, SourceFile } from "../core/scanner";
+import type { DirectoryEntry, FileStat, FileSystemPort } from "../core/scanner";
 
 const SUPPORTED_MIME_TYPES = new Set(["application/pdf", "application/epub+zip"]);
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -47,7 +43,6 @@ export class ZoteroFileSystemPort implements FileSystemPort {
 export function getLibraryCollections(libraryID: number): ExistingCollection[] {
   return Zotero.Collections.getByLibrary(libraryID, true, false).map((collection: any) => ({
     id: collection.id,
-    libraryID: collection.libraryID,
     parentID: collection.parentID,
     name: collection.name,
   }));
@@ -74,7 +69,7 @@ export async function getExistingAttachments(
 
   let processed = 0;
   for (const item of items) {
-    // Yield periodically so Zotero stays responsive while we stat and hash.
+    // Yield periodically so a large library does not block the UI thread.
     processed += 1;
     if (processed % 25 === 0) await yieldToEventLoop();
     const path = await item.getFilePathAsync();
@@ -133,7 +128,6 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
         await collection.saveTx();
         match = {
           id: collection.id,
-          libraryID: this.libraryID,
           parentID: parentID || false,
           name: segment,
         };
@@ -183,13 +177,25 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     }
     attachment.setField("title", request.name);
     await attachment.saveTx({ skipDateModifiedUpdate: true });
-    if (request.collectionID) this.rememberName(request.collectionID, request.name);
+    // Record against the collection the file actually lands in. On the Replace
+    // path the attachment is filed under a parent item rather than passed a
+    // collectionID, so without targetCollectionID a later Keep Both in the same
+    // collection would not know this name is taken.
+    const landedIn = request.targetCollectionID ?? request.collectionID;
+    if (landedIn) this.rememberName(landedIn, request.name);
     return attachment.id;
   }
 
-  /** Moves replaced attachments to the trash (recoverable, never deleted). */
-  async trashAttachments(ids: number[]): Promise<void> {
+  /**
+   * Moves replaced attachments to the trash (recoverable, never deleted) and
+   * releases their filenames, so a later Keep Both can reuse a name that this
+   * run just vacated instead of skipping to a higher suffix.
+   */
+  async trashAttachments(ids: number[], collectionID?: number, names?: string[]): Promise<void> {
     await Zotero.Items.trashTx(ids);
+    if (collectionID === undefined || !names?.length) return;
+    const remembered = this.namesByCollection.get(collectionID);
+    if (remembered) names.forEach((name) => remembered.delete(name));
   }
 
   /** Filenames already used in a collection, for Keep Both naming. */
