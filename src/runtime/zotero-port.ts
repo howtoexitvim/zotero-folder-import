@@ -208,27 +208,22 @@ export class ZoteroImportPort extends ZoteroFileSystemPort implements ImportPort
     return attachment.id;
   }
 
+  /**
+   * Zotero items can belong to several collections at once, so a file that is
+   * already in the library just gets added to the new collection. The existing
+   * item is never renamed: it may be filed elsewhere under a name the user
+   * chose, and silently rewriting that to match the folder being imported
+   * would change entries the user did not ask to touch.
+   */
   async linkExisting(
     attachmentID: number,
     collectionID: number,
     sourceName: string,
-    renameToSource = true,
   ): Promise<void> {
     const attachment = await Zotero.Items.getAsync(attachmentID);
     if (!attachment?.isStoredFileAttachment?.()) throw new Error(`Attachment ${attachmentID} is unavailable`);
     const container = attachment.parentID ? await Zotero.Items.getAsync(attachment.parentID) : attachment;
-    await Zotero.Items.loadDataTypes([attachment], ["itemData"]);
     await Zotero.Items.loadDataTypes([container], ["collections"]);
-    if (renameToSource) {
-      const renamed = await attachment.renameAttachmentFile(sourceName, {
-        overwrite: false,
-        unique: false,
-        updateTitle: false,
-      });
-      if (renamed !== true) throw new Error(`Unable to rename attachment file to ${sourceName}`);
-      attachment.setField("title", sourceName);
-      await attachment.saveTx({ skipDateModifiedUpdate: true });
-    }
 
     if (!container.inCollection(collectionID)) {
       container.addToCollection(collectionID);

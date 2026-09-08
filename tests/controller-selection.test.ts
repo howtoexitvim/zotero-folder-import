@@ -41,6 +41,35 @@ describe("chrome registration", () => {
   });
 });
 
+describe("menu localization", () => {
+  it("inserts the plugin FTL into each main window", async () => {
+    const bootstrap = await readFile(
+      new URL("../src/bootstrap.ts", import.meta.url),
+      "utf8",
+    );
+
+    // Without this the menu item's l10nID has no bundle to resolve against in
+    // that window, so File > Import Folder renders as a blank selectable row.
+    expect(bootstrap).toContain("onMainWindowLoad");
+    expect(bootstrap).toContain('insertFTLIfNeeded("folder-import.ftl")');
+    // Zotero looks the hook up on the bootstrap scope, so it must be exported.
+    expect(bootstrap).toMatch(/Object\.assign\(globalThis, \{[^}]*onMainWindowLoad/);
+  });
+});
+
+describe("import progress", () => {
+  it("yields to the event loop between files", async () => {
+    const importer = await readFile(
+      new URL("../src/core/importer.ts", import.meta.url),
+      "utf8",
+    );
+
+    // The loop only awaits file I/O, which never lets the dialog repaint, so
+    // the progress bar sat frozen until the entire import finished.
+    expect(importer).toContain("setTimeout(resolve, 0)");
+  });
+});
+
 describe("dialog argument passing", () => {
   it("self-references wrappedJSObject the way Zotero's own dialogs do", async () => {
     const controller = await controllerSource;

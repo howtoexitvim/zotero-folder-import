@@ -53,8 +53,8 @@ function fakePort(options: { failImportPath?: string } = {}) {
       if (request.path === options.failImportPath) throw new Error("copy failed");
       return nextID++;
     },
-    async linkExisting(id, collectionID, name, renameToSource = true) {
-      events.push(`link:${id}:${collectionID}:${name}:rename=${renameToSource}`);
+    async linkExisting(id, collectionID, name) {
+      events.push(`link:${id}:${collectionID}:${name}`);
     },
     async trashAttachments(ids) {
       events.push(`trash:${ids.join(",")}`);
@@ -84,7 +84,7 @@ describe("executeImport", () => {
 
     const result = await executeImport(input, port);
 
-    expect(events).toEqual(["collection:Root", "link:11:7:paper.pdf:rename=true"]);
+    expect(events).toEqual(["collection:Root", "link:11:7:paper.pdf"]);
     expect(result.reused).toBe(1);
   });
 
@@ -102,7 +102,7 @@ describe("executeImport", () => {
     expect(events).toEqual([
       "collection:Root",
       "import:/source/paper.pdf:paper.pdf:parent=50",
-      "link:100:7:paper.pdf:rename=true",
+      "link:100:7:paper.pdf",
       "trash:9",
       "index:100",
     ]);
@@ -192,7 +192,7 @@ describe("executeImport", () => {
     const result = await executeImport(input, port);
 
     expect(events.filter((event) => event.startsWith("import:"))).toHaveLength(1);
-    expect(events).toContain("link:100:7:paper.pdf:rename=false");
+    expect(events).toContain("link:100:7:paper.pdf");
     expect(result).toMatchObject({ imported: 1, reused: 1 });
   });
 

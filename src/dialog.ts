@@ -34,7 +34,7 @@ function initWords(): void {
   words = zh
     ? {
       new: "新导入",
-      reused: "复用",
+      reused: "已在库中，加入此 collection",
       conflict: "冲突",
       annotated: "含标注或存在多个旧附件，不能替换",
       unresolved: "请选择…",
@@ -46,7 +46,7 @@ function initWords(): void {
     }
     : {
       new: "New",
-      reused: "Reuse",
+      reused: "Already in library — added here",
       conflict: "Conflict",
       annotated: "Annotations or multiple existing files; Replace unavailable",
       unresolved: "Choose…",

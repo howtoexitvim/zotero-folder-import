@@ -108,3 +108,35 @@ describe("ZoteroImportPort", () => {
     });
   });
 });
+
+describe("reuse never mutates existing library items", () => {
+  it("adds the item to the collection without renaming it", async () => {
+    const calls: string[] = [];
+    const item = {
+      id: 5,
+      parentID: false,
+      isStoredFileAttachment: () => true,
+      getFilePathAsync: async () => "/storage/User Chosen Name.pdf",
+      inCollection: () => false,
+      addToCollection: (id: number) => calls.push(`addToCollection:${id}`),
+      saveTx: async () => calls.push("saveTx"),
+      renameAttachmentFile: async () => {
+        calls.push("renameAttachmentFile");
+        return true;
+      },
+      setField: () => calls.push("setField"),
+    };
+    (globalThis as any).PathUtils = { filename: (p: string) => p.split("/").at(-1)! };
+    (globalThis as any).Zotero = {
+      Items: { getAsync: async () => item, loadDataTypes: async () => {} },
+    };
+
+    const port = new ZoteroImportPort(1, [], []);
+    await port.linkExisting(5, 7, "Folder Name.pdf");
+
+    // An item already filed elsewhere keeps the name the user gave it.
+    expect(calls).not.toContain("renameAttachmentFile");
+    expect(calls).not.toContain("setField");
+    expect(calls).toContain("addToCollection:7");
+  });
+});

@@ -24,7 +24,6 @@ export interface ImportPort {
     attachmentID: number,
     collectionID: number,
     sourceName: string,
-    renameToSource?: boolean,
   ): Promise<void>;
   trashAttachments(ids: number[]): Promise<void>;
   occupiedNames(collectionID: number): Promise<string[]>;
@@ -102,7 +101,7 @@ export async function executeImport(
       const contentKey = `${file.size}:${file.md5}:${normalizeName(file.name)}`;
       const importedEarlier = contentAttachments.get(contentKey);
       if (importedEarlier !== undefined) {
-        await port.linkExisting(importedEarlier, collectionID, file.name, false);
+        await port.linkExisting(importedEarlier, collectionID, file.name);
         result.reused += 1;
         continue;
       }
@@ -190,6 +189,10 @@ export async function executeImport(
       } catch {
         // Progress UI is advisory. Closing or tearing down the dialog must not stop imports.
       }
+      // The loop awaits only file I/O, which never returns to the event loop
+      // long enough for the dialog to repaint, so the progress bar would sit
+      // frozen until the whole import finished. Yield so the UI can paint.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
 
