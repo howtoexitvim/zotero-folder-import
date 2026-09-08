@@ -58,6 +58,14 @@ function initWords(): void {
     };
 }
 
+const HTML_NS = "http://www.w3.org/1999/xhtml";
+
+// The dialog root is a XUL <window>, so document.createElement() would build
+// XUL elements. Everything we build at runtime is HTML.
+function html<T extends HTMLElement>(tag: string): T {
+  return document.createElementNS(HTML_NS, tag) as unknown as T;
+}
+
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing dialog element ${id}`);
@@ -99,7 +107,7 @@ function renderSummary(): void {
   const scanErrorList = byId("scan-error-list");
   scanErrorList.replaceChildren();
   for (const error of data.scanErrors) {
-    const item = document.createElement("li");
+    const item = html<HTMLLIElement>("li");
     item.textContent = `${error.path}: ${error.message}`;
     scanErrorList.append(item);
   }
@@ -107,12 +115,12 @@ function renderSummary(): void {
   const collections = byId("collection-list");
   collections.replaceChildren();
   for (const segments of data.plan.collectionsToCreate) {
-    const item = document.createElement("li");
+    const item = html<HTMLLIElement>("li");
     item.textContent = segments.join(" / ");
     collections.append(item);
   }
   if (!data.plan.collectionsToCreate.length) {
-    const item = document.createElement("li");
+    const item = html<HTMLLIElement>("li");
     item.textContent = zh ? "全部复用现有 collection" : "All collections already exist";
     collections.append(item);
   }
@@ -135,7 +143,7 @@ function renderFiles(): void {
     const actionCell = row.insertCell();
     if (file.classification !== "conflict") return;
 
-    const select = document.createElement("select");
+    const select = html<HTMLSelectElement>("select");
     select.dataset.index = String(index);
     const options: Array<[ConflictAction, string, boolean]> = [
       ["unresolved", words.unresolved, false],
@@ -144,7 +152,7 @@ function renderFiles(): void {
       ["keep-both", words.keepBoth, false],
     ];
     for (const [value, label, disabled] of options) {
-      const option = document.createElement("option");
+      const option = html<HTMLOptionElement>("option");
       option.value = value;
       option.textContent = label;
       option.disabled = disabled;
@@ -198,7 +206,7 @@ function renderResult(result: ImportResult): void {
   const errors = byId("result-errors");
   errors.replaceChildren();
   for (const error of result.errors) {
-    const item = document.createElement("li");
+    const item = html<HTMLLIElement>("li");
     item.textContent = `${error.path}: ${error.message}`;
     errors.append(item);
   }
@@ -233,18 +241,20 @@ async function beginImport(): Promise<void> {
 function reportFatal(error: unknown): void {
   // A dialog that throws during setup would otherwise stay blank with no way
   // to tell what went wrong, so paint the failure into the window itself.
+  // This is a XUL document, so there is no document.body and createElement()
+  // would build XUL elements -- create HTML ones explicitly.
   const message = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
-  const pre = document.createElement("pre");
-  pre.className = "fatal";
+  const root = document.getElementById("folder-import-root") ?? document.documentElement;
+  const pre = document.createElementNS(HTML_NS, "pre");
+  pre.setAttribute("class", "fatal");
   pre.textContent = message;
-  document.body?.replaceChildren(pre);
-  const close = document.createElement("button");
+  const close = document.createElementNS(HTML_NS, "button");
   close.textContent = "Close";
   close.addEventListener("click", () => window.close());
-  document.body?.append(close);
+  root.replaceChildren(pre, close);
 }
 
-function start(): void {
+function init(): void {
   try {
     data = readDialogData();
     files = data.plan.files.map((file) => ({ ...file }));
@@ -261,8 +271,6 @@ function start(): void {
   }
 }
 
-if (document.readyState === "loading") {
-  window.addEventListener("DOMContentLoaded", start, { once: true });
-} else {
-  start();
-}
+// The XUL <window> calls FolderImportDialog.init() from its onload attribute,
+// matching how Zotero's own dialogs bootstrap.
+Object.assign(globalThis, { FolderImportDialog: { init } });

@@ -13,6 +13,51 @@ describe("Zotero install manifest", () => {
     );
   });
 
+  it("uses a XUL window root, as every Zotero dialog does", async () => {
+    const dialog = await readFile(
+      new URL("../addon/content/dialog.xhtml", import.meta.url),
+      "utf8",
+    );
+
+    // All 26 dialogs shipped in Zotero 10 use a XUL <window> root. An HTML
+    // root opened via openDialog() in a chrome context renders an empty
+    // window and never runs the page script.
+    expect(dialog).toContain(
+      'xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"',
+    );
+    expect(dialog).toMatch(/<window[\s>]/);
+    expect(dialog).not.toMatch(/<html xmlns="http:\/\/www\.w3\.org\/1999\/xhtml">/);
+  });
+
+  it("bootstraps from the window's onload handler", async () => {
+    const dialog = await readFile(
+      new URL("../addon/content/dialog.xhtml", import.meta.url),
+      "utf8",
+    );
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(dialog).toContain('onload="FolderImportDialog.init()"');
+    expect(script).toContain("FolderImportDialog");
+  });
+
+  it("creates runtime elements in the HTML namespace", async () => {
+    const script = await readFile(
+      new URL("../src/dialog.ts", import.meta.url),
+      "utf8",
+    );
+
+    // The plain createElement() in a XUL document builds XUL elements, which
+    // would render nothing for <li>/<select>/<option>. Strip comments first so
+    // prose mentioning the API does not trip the assertion.
+    const code = script.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+    expect(code).not.toMatch(/document\.createElement(?!NS)/);
+    expect(code).toContain("createElementNS(HTML_NS");
+  });
+
   it("references Fluent files by bare filename", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),

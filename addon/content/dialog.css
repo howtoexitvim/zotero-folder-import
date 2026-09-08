@@ -7,15 +7,21 @@
 
 * { box-sizing: border-box; }
 
-body {
+/* XUL document: there is no <body>; the vbox root fills the window. */
+#folder-import-root {
   margin: 0;
   min-width: 760px;
   min-height: 560px;
   display: grid;
   grid-template-rows: 1fr auto;
+  overflow: hidden;
 }
 
-main { padding: 24px; overflow: auto; }
+main {
+  padding: 24px;
+  overflow: auto;
+  min-height: 0;
+}
 h1 { margin: 0 0 6px; font-size: 22px; }
 header p { margin-top: 0; color: GrayText; }
 

@@ -1,77 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title data-l10n-id="folder-import-dialog-title">Folder Import</title>
-    <link rel="localization" href="folder-import.ftl" />
-    <link rel="stylesheet" href="dialog.css" />
-    <script defer="defer" src="dialog.js"></script>
-  </head>
-  <body>
-    <main>
-      <section id="preview-view">
-        <header>
-          <h1 data-l10n-id="folder-import-preview-title">Review import</h1>
-          <p data-l10n-id="folder-import-preview-description">Nothing is written until you confirm.</p>
-        </header>
+<?xml-stylesheet href="chrome://global/skin/global.css"?>
+<?xml-stylesheet href="chrome://zotero/skin/zotero.css"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns:html="http://www.w3.org/1999/xhtml"
+    id="folder-import-dialog"
+    data-l10n-id="folder-import-dialog-title"
+    width="1000"
+    height="760"
+    onload="FolderImportDialog.init()"
+>
+  <linkset>
+    <html:link rel="localization" href="folder-import.ftl" />
+  </linkset>
+  <html:link rel="stylesheet" href="dialog.css" />
+  <script src="dialog.js" />
 
-        <dl class="paths">
-          <dt data-l10n-id="folder-import-source">Source</dt><dd id="source-path"></dd>
-          <dt data-l10n-id="folder-import-destination">Destination</dt><dd id="destination-path"></dd>
-        </dl>
+  <vbox id="folder-import-root" flex="1">
+    <html:main>
+      <html:section id="preview-view">
+        <html:header>
+          <html:h1 data-l10n-id="folder-import-preview-title">Review import</html:h1>
+          <html:p data-l10n-id="folder-import-preview-description">Nothing is written until you confirm.</html:p>
+        </html:header>
 
-        <div class="metrics">
-          <div><strong id="count-total">0</strong><span data-l10n-id="folder-import-files">files</span></div>
-          <div><strong id="count-size">0 B</strong><span data-l10n-id="folder-import-total-size">total size</span></div>
-          <div><strong id="count-new">0</strong><span data-l10n-id="folder-import-new">new</span></div>
-          <div><strong id="count-reused">0</strong><span data-l10n-id="folder-import-reused">reused</span></div>
-          <div><strong id="count-conflicts">0</strong><span data-l10n-id="folder-import-conflicts">conflicts</span></div>
-          <div><strong id="count-unsupported">0</strong><span data-l10n-id="folder-import-unsupported">unsupported</span></div>
-          <div><strong id="count-errors">0</strong><span data-l10n-id="folder-import-errors">errors</span></div>
-        </div>
+        <html:dl class="paths">
+          <html:dt data-l10n-id="folder-import-source">Source</html:dt><html:dd id="source-path"></html:dd>
+          <html:dt data-l10n-id="folder-import-destination">Destination</html:dt><html:dd id="destination-path"></html:dd>
+        </html:dl>
 
-        <details>
-          <summary data-l10n-id="folder-import-collections-to-create">Collections to create</summary>
-          <ul id="collection-list"></ul>
-        </details>
+        <html:div class="metrics">
+          <html:div><html:strong id="count-total">0</html:strong><html:span data-l10n-id="folder-import-files">files</html:span></html:div>
+          <html:div><html:strong id="count-size">0 B</html:strong><html:span data-l10n-id="folder-import-total-size">total size</html:span></html:div>
+          <html:div><html:strong id="count-new">0</html:strong><html:span data-l10n-id="folder-import-new">new</html:span></html:div>
+          <html:div><html:strong id="count-reused">0</html:strong><html:span data-l10n-id="folder-import-reused">reused</html:span></html:div>
+          <html:div><html:strong id="count-conflicts">0</html:strong><html:span data-l10n-id="folder-import-conflicts">conflicts</html:span></html:div>
+          <html:div><html:strong id="count-unsupported">0</html:strong><html:span data-l10n-id="folder-import-unsupported">unsupported</html:span></html:div>
+          <html:div><html:strong id="count-errors">0</html:strong><html:span data-l10n-id="folder-import-errors">errors</html:span></html:div>
+        </html:div>
 
-        <details id="scan-error-details" hidden="hidden">
-          <summary data-l10n-id="folder-import-scan-errors">Files unavailable during scanning</summary>
-          <ul id="scan-error-list" class="errors"></ul>
-        </details>
+        <html:details>
+          <html:summary data-l10n-id="folder-import-collections-to-create">Collections to create</html:summary>
+          <html:ul id="collection-list"></html:ul>
+        </html:details>
 
-        <div class="conflict-toolbar">
-          <label><input id="apply-all" type="checkbox" /> <span data-l10n-id="folder-import-apply-all">Apply this choice to all remaining conflicts</span></label>
-        </div>
+        <html:details id="scan-error-details" hidden="hidden">
+          <html:summary data-l10n-id="folder-import-scan-errors">Files unavailable during scanning</html:summary>
+          <html:ul id="scan-error-list" class="errors"></html:ul>
+        </html:details>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th data-l10n-id="folder-import-file">File</th>
-                <th data-l10n-id="folder-import-type">Type</th>
-                <th data-l10n-id="folder-import-size">Size</th>
-                <th data-l10n-id="folder-import-status">Status</th>
-                <th data-l10n-id="folder-import-action">Action</th>
-              </tr>
-            </thead>
-            <tbody id="file-table-body"></tbody>
-          </table>
-        </div>
-      </section>
+        <html:div class="conflict-toolbar">
+          <html:label><html:input id="apply-all" type="checkbox" /> <html:span data-l10n-id="folder-import-apply-all">Apply this choice to all remaining conflicts</html:span></html:label>
+        </html:div>
 
-      <section id="progress-view" hidden="hidden">
-        <h1 id="progress-title" data-l10n-id="folder-import-importing">Importing…</h1>
-        <progress id="progress-meter" value="0" max="1"></progress>
-        <p id="progress-label"></p>
-        <p id="result-summary"></p>
-        <ul id="result-errors" class="errors"></ul>
-      </section>
-    </main>
+        <html:div class="table-wrap">
+          <html:table>
+            <html:thead>
+              <html:tr>
+                <html:th data-l10n-id="folder-import-file">File</html:th>
+                <html:th data-l10n-id="folder-import-type">Type</html:th>
+                <html:th data-l10n-id="folder-import-size">Size</html:th>
+                <html:th data-l10n-id="folder-import-status">Status</html:th>
+                <html:th data-l10n-id="folder-import-action">Action</html:th>
+              </html:tr>
+            </html:thead>
+            <html:tbody id="file-table-body"></html:tbody>
+          </html:table>
+        </html:div>
+      </html:section>
 
-    <footer>
-      <button id="cancel-button" data-l10n-id="folder-import-cancel">Cancel</button>
-      <button id="import-button" class="primary" data-l10n-id="folder-import-confirm">Import</button>
-      <button id="close-button" class="primary" hidden="hidden" data-l10n-id="folder-import-close">Close</button>
-    </footer>
-  </body>
-</html>
+      <html:section id="progress-view" hidden="hidden">
+        <html:h1 id="progress-title" data-l10n-id="folder-import-importing">Importing…</html:h1>
+        <html:progress id="progress-meter" value="0" max="1"></html:progress>
+        <html:p id="progress-label"></html:p>
+        <html:p id="result-summary"></html:p>
+        <html:ul id="result-errors" class="errors"></html:ul>
+      </html:section>
+    </html:main>
+
+    <html:footer>
+      <html:button id="cancel-button" data-l10n-id="folder-import-cancel">Cancel</html:button>
+      <html:button id="import-button" class="primary" data-l10n-id="folder-import-confirm">Import</html:button>
+      <html:button id="close-button" class="primary" hidden="hidden" data-l10n-id="folder-import-close">Close</html:button>
+    </html:footer>
+  </vbox>
+</window>

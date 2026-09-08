@@ -11,11 +11,13 @@ describe("ZoteroPane API usage", () => {
   it("uses the plural collection tree accessor", async () => {
     const controller = await controllerSource;
 
-    // Zotero 10 removed the singular ZoteroPane.getCollectionTreeRow(); it now
-    // throws "was removed -- use ZoteroPane.getCollectionTreeRows()". The
-    // plural form returns only the selected rows, which is what we want.
-    expect(controller).toContain("getCollectionTreeRows()");
-    expect(controller).not.toMatch(/getCollectionTreeRow(?!s)/);
+    // Zotero 10 removed the singular accessor; it now throws unconditionally.
+    // The plural form returns only the selected rows, which is what we want.
+    // Strip comments so prose naming the API does not trip the assertion.
+    const code = controller.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+    expect(code).toContain("getCollectionTreeRows()");
+    expect(code).not.toMatch(/getCollectionTreeRow(?!s)/);
   });
 });
 
