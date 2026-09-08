@@ -325,12 +325,35 @@ function updateImportButton(): void {
   else button.removeAttribute("disabled");
 }
 
-/** Swaps the preview for the progress view once the import starts. */
+/**
+ * Swaps the preview for the progress view once the import starts, and shrinks
+ * the window to fit: the progress panel is a few lines, so keeping the
+ * preview's height would leave most of the window empty.
+ */
 function showProgress(): void {
   setHidden(byId("preview-view"), true);
   setHidden(byId("progress-view"), false);
   setHidden(byId("cancel-button"), true);
   setHidden(byId("import-button"), true);
+  resizeToContent(360);
+}
+
+/**
+ * Resizes the window to its content height, clamped so it neither collapses nor
+ * grows past the screen. XUL sizes to content only at load, so this is done by
+ * hand whenever the visible panel changes.
+ */
+function resizeToContent(preferredHeight: number): void {
+  try {
+    const width = window.outerWidth;
+    const height = Math.min(
+      Math.max(preferredHeight, 240),
+      window.screen?.availHeight ?? preferredHeight,
+    );
+    window.resizeTo(width, height);
+  } catch {
+    // Resizing is cosmetic; a window manager refusing it must not break the run.
+  }
 }
 
 /** Advances the progress bar; called once per file by the importer. */
@@ -358,6 +381,8 @@ function renderResult(result: ImportResult): void {
     appendListItem(errors, `${error.path}: ${error.message}`);
   }
   setHidden(byId("close-button"), false);
+  // Give error lists room; a clean run stays compact.
+  resizeToContent(result.errors.length ? Math.min(360 + result.errors.length * 22, 640) : 300);
 }
 
 /** Runs the import and renders the outcome, including on failure. */

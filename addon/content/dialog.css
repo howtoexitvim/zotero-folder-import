@@ -65,8 +65,12 @@
 menulist { max-width: 220px; }
 checkbox { margin: 0; }
 
-progress { width: 100%; height: 18px; margin: 24px 0 8px; }
-#progress-label, #result-summary { margin-top: 6px; }
+progress { width: 100%; height: 6px; margin: 18px 0 0; border: none; }
+.progress-line { margin-top: 10px; }
+#result-summary { color: GrayText; }
+/* The progress panel is a handful of lines; without this it inherits the
+   preview's height and leaves most of the window empty. */
+#progress-view { padding-bottom: 8px; }
 .errors { color: #cf222e; overflow-wrap: anywhere; }
 
 #footer {
