@@ -25,16 +25,15 @@ function collectionPath(collection: any): string {
 }
 
 function selectedRows(window: any): SelectedRow[] {
-  // The plural accessor returns every row in the tree; the import target is
-  // whatever the user actually has selected.
-  const row = window.ZoteroPane.getCollectionTreeRow();
-  if (!row) return [];
-  return [{
+  // Zotero 10 removed the singular accessor (it now throws). The plural form
+  // returns only the selected rows (collectionsView.selection.selected), which
+  // is already what we want. Multi-select means it can hold more than one.
+  return window.ZoteroPane.getCollectionTreeRows().map((row: any) => ({
     type: row.type,
     libraryID: row.ref?.libraryID,
     collectionID: row.isCollection?.() ? row.ref.id : undefined,
     collectionPath: row.isCollection?.() ? collectionPath(row.ref) : undefined,
-  }];
+  }));
 }
 
 function rootName(path: string): string {
@@ -125,7 +124,7 @@ export class FolderImportController {
     });
     const port = new ZoteroImportPort(destination.libraryID, collections, attachments);
 
-    const dialogData = {
+    const dialogData: any = {
       locale: Zotero.locale ?? "en-US",
       sourcePath,
       destinationPath: `${destination.baseLabel} / ${plan.rootName}`,
@@ -137,11 +136,16 @@ export class FolderImportController {
         onProgress: (progress: ImportProgress) => void,
       ) => executeImport(resolvedPlan(plan, actions), port, onProgress),
     };
+    // Zotero's own dialogs self-reference here (see fileInterface.js) so that
+    // both `arg` and `arg.wrappedJSObject` resolve to the same object. Passing
+    // { wrappedJSObject: data } instead hands the dialog an outer wrapper whose
+    // own fields are empty.
+    dialogData.wrappedJSObject = dialogData;
     window.openDialog(
       `${this.rootURI}content/dialog.xhtml`,
       "folder-import-dialog",
       "chrome,centerscreen,resizable,modal,width=1000,height=760",
-      { wrappedJSObject: dialogData },
+      dialogData,
     );
   }
 }

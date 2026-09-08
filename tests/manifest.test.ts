@@ -13,23 +13,17 @@ describe("Zotero install manifest", () => {
     );
   });
 
-  it("registers the Fluent files so dialog labels are not blank", async () => {
-    const manifest = JSON.parse(
-      await readFile(new URL("../addon/manifest.json", import.meta.url), "utf8"),
-    );
-
-    expect(manifest.localization).toContain("locale/{locale}/folder-import.ftl");
-  });
-
-  it("points the dialog at the registered localization resource", async () => {
+  it("references Fluent files by bare filename", async () => {
     const dialog = await readFile(
       new URL("../addon/content/dialog.xhtml", import.meta.url),
       "utf8",
     );
 
-    // A bare "folder-import.ftl" href does not resolve to the registered
-    // resource, leaving every data-l10n-id element blank.
-    expect(dialog).toContain('href="locale/folder-import.ftl"');
+    // Zotero auto-registers locale/<locale>/*.ftl for every plugin and keys the
+    // resource by bare filename (Zotero.Plugins registerLocales), so the href
+    // must not carry a locale/ prefix and the manifest needs no localization
+    // key of its own.
+    expect(dialog).toContain('href="folder-import.ftl"');
   });
 
   it("keeps the built XPI filename in step with the manifest version", async () => {
