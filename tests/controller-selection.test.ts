@@ -42,18 +42,18 @@ describe("chrome registration", () => {
 });
 
 describe("menu localization", () => {
-  it("inserts the plugin FTL into each main window", async () => {
-    const bootstrap = await readFile(
-      new URL("../src/bootstrap.ts", import.meta.url),
-      "utf8",
-    );
+  it("sets the menu label directly instead of relying on l10nID", async () => {
+    const controller = await controllerSource;
 
-    // Without this the menu item's l10nID has no bundle to resolve against in
-    // that window, so File > Import Folder renders as a blank selectable row.
-    expect(bootstrap).toContain("onMainWindowLoad");
-    expect(bootstrap).toContain('insertFTLIfNeeded("folder-import.ftl")');
-    // Zotero looks the hook up on the bootstrap scope, so it must be exported.
-    expect(bootstrap).toMatch(/Object\.assign\(globalThis, \{[^}]*onMainWindowLoad/);
+    // Zotero never loads a plugin's own Fluent files for menus: the code that
+    // would do it is commented out in menuManager.js. An l10nID therefore has
+    // no bundle and the item renders as a blank but selectable row, so the
+    // label has to be set in onShowing.
+    const code = controller.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+    expect(code).toContain("onShowing");
+    expect(code).toContain('setAttribute("label", menuLabel())');
+    expect(code).not.toContain("l10nID");
   });
 });
 

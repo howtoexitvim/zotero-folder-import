@@ -15,15 +15,6 @@ function shutdown(): void {
   Zotero.debug("[Folder Import] stopped");
 }
 
-/**
- * The menu item's l10nID only resolves once the plugin's Fluent file is
- * inserted into that window, otherwise the menu renders as a blank but
- * selectable row.
- */
-function onMainWindowLoad({ window }: { window: any }): void {
-  window.MozXULElement.insertFTLIfNeeded("folder-import.ftl");
-}
-
 function install(): void {
   Zotero.debug("[Folder Import] installed");
 }
@@ -32,5 +23,5 @@ function uninstall(): void {
   Zotero.debug("[Folder Import] uninstalled");
 }
 
-Object.assign(globalThis, { startup, shutdown, install, uninstall, onMainWindowLoad });
+Object.assign(globalThis, { startup, shutdown, install, uninstall });
 

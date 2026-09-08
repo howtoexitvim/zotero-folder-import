@@ -51,6 +51,11 @@ function resolvedPlan(plan: ImportPlan, actions: DialogActions): ImportPlan {
 
 const CHROME_PACKAGE = "folder-import";
 
+function menuLabel(): string {
+  const locale = String(Zotero.locale ?? "en-US").toLowerCase();
+  return locale.startsWith("zh") ? "导入文件夹…" : "Import Folder…";
+}
+
 export class FolderImportController {
   private registeredMenuID?: string;
   private chromeHandle?: { destruct(): void };
@@ -82,8 +87,14 @@ export class FolderImportController {
       target: "main/menubar/file",
       menus: [{
         menuType: "menuitem",
-        l10nID: "folder-import-menu-import-folder",
         enableForTabTypes: ["library"],
+        // Zotero never loads a plugin's own Fluent files for menus -- the code
+        // that would do it is commented out in menuManager.js -- so an l10nID
+        // here resolves to nothing and the item renders as a blank but
+        // selectable row. Set the label directly instead, as working plugins do.
+        onShowing: (_event: any, context: any) => {
+          context?.menuElem?.setAttribute("label", menuLabel());
+        },
         onCommand: (event: any) => {
           const window = event.target.ownerGlobal;
           void this.run(window).catch((error) => {

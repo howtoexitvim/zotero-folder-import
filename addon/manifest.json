@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Folder Import",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Import PDF and EPUB folders into Zotero collections without metadata renaming.",
   "author": "Shuqi",
   "icons": {
