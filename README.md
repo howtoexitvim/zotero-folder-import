@@ -12,7 +12,7 @@ npm run build
 npm run verify
 ```
 
-`npm run build` creates `dist/folder-import-0.1.0.xpi`. Runtime code has no third-party dependencies, network calls, telemetry, or updater. The build uses TypeScript and esbuild; tests use Vitest.
+`npm run build` creates `dist/folder-import-0.1.1.xpi`. Runtime code has no third-party dependencies, network calls, telemetry, or functional updater. Zotero 10 requires an `update_url` in every installable manifest, so this private build uses a reserved `.invalid` address that cannot host an update service. The build uses TypeScript and esbuild; tests use Vitest.
 
 ## Architecture
 
@@ -27,9 +27,9 @@ The executor refuses plans with unresolved conflicts. Replace imports first and 
 ## Compatibility and privacy
 
 - Plugin ID: `folder-import@shuqi.local`
-- Version: `0.1.0`
+- Version: `0.1.1`
 - Zotero: `10.0` through `10.0.*`
 - Package license field: `UNLICENSED`
-- No remote repository or release channel is configured.
+- No working remote repository or release channel is configured; the required update URL uses the reserved `.invalid` top-level domain.
 
 Do not publish the repository or XPI without first making an explicit licensing and distribution decision.
