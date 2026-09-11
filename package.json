@@ -1,8 +1,7 @@
 {
   "name": "shuqi-zotero-folder-import",
   "version": "0.1.21",
-  "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "vitest run",

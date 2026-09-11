@@ -1,6 +1,16 @@
-# Folder Import Plugin
+# Zotero Folder Import
 
-Private, clean-room Zotero 10 plugin for importing PDF and EPUB directory trees as managed attachments. Folder structure becomes nested collections; filenames are preserved and no metadata lookup or renaming is performed.
+A clean-room Zotero 10 plugin for importing PDF and EPUB directory trees as managed attachments. Folder structure becomes nested collections; filenames are preserved and no metadata lookup or renaming is performed.
+
+No third-party runtime dependencies, no network calls, no telemetry.
+
+## Install
+
+Download the `.xpi` from the [releases page](../../releases), then in Zotero: **Tools → Add-ons → gear icon → Install Add-on From File…** and pick the downloaded file.
+
+Then right-click any collection (or use Tools) and choose the folder-import entry to pick a directory tree.
+
+Requires Zotero 10.
 
 ## Commands
 
@@ -12,7 +22,7 @@ npm run build
 npm run verify
 ```
 
-`npm run build` writes `dist/folder-import-<version>.xpi`, taking the version from `addon/manifest.json`. Runtime code has no third-party dependencies, network calls, telemetry, or functional updater. Zotero 10 requires an `update_url` in every installable manifest, so this private build uses a reserved `.invalid` address that cannot host an update service. The build uses TypeScript and esbuild; tests use Vitest.
+`npm run build` writes `dist/folder-import-<version>.xpi`, taking the version from `addon/manifest.json`. Runtime code has no third-party dependencies, network calls, telemetry, or functional updater. Zotero 10 requires an `update_url` in every installable manifest, so the build points at a reserved `.invalid` address that cannot host an update service — there is no auto-update; grab new versions from the releases page. The build uses TypeScript and esbuild; tests use Vitest.
 
 ## Architecture
 
@@ -69,7 +79,9 @@ The executor refuses plans with unresolved conflicts. Replace imports first and 
 
 - Plugin ID: `folder-import@shuqi.local`
 - Zotero: `10.0` through `10.0.*`
-- Package license field: `UNLICENSED`
-- No working remote repository or release channel is configured; the required update URL uses the reserved `.invalid` top-level domain.
+- No network calls, no telemetry, no metadata lookup. Files are matched by name within the destination collection; content is never read or hashed.
+- No auto-update channel: the manifest's required `update_url` points at a reserved `.invalid` address. Install new versions from the releases page.
 
-Do not publish the repository or XPI without first making an explicit licensing and distribution decision.
+## License
+
+[MIT](LICENSE)
