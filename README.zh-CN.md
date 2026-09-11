@@ -10,85 +10,70 @@
 
 </div>
 
-Zotero Folder Import 是一个 Zotero 10 插件，用于把整个 PDF、EPUB 文件夹导入为托管附件。
+你的硬盘里堆着多年来按文件夹整理好的 PDF，而 Zotero 只肯一个一个地收。
 
-文件夹结构会变成嵌套的 collection。文件名原样保留，不做任何元数据查询或重命名 —— 你在 Finder 里看到什么，导进 Zotero 就是什么。
+Zotero Folder Import 直接接收整棵目录树。文件夹会变成嵌套的分类（collections），文件名原样保留，不重命名，也不联网查元数据。你在访达里看到的样子，就是它在 Zotero 里的样子。
 
-没有第三方运行时依赖，不发起网络请求，不做任何遥测。
+在写入任何内容之前，你会先看到一个审阅界面：各项统计、将要创建的分类、以及每一个文件的状态。然后由你来决定。
+
+## 为什么选择 Folder Import
+
+- 📁 **保留你的文件夹结构**：目录树变成嵌套分类，文件名原样保留。不查元数据，不重命名。
+- 👀 **先看清，再动手**：审阅对话框会显示总计数量、即将创建的分类，以及逐个文件的状态——在任何文件被移动之前。
+- 🤝 **冲突由你决定**：逐个文件选择替换（Replace）、两者都保留（Keep Both）或忽略（Ignore）。替换会先导入新文件，确认成功之后才把旧文件移入回收站。
+- ⏹️ **随时可以停下**：导入途中取消，已经导入的内容会原样保留。
+- 🧩 **副本彼此独立**：每次导入都是独立的附件，在一个分类里删除或标注，不会影响另一个分类。
+- 🔒 **隐私是默认设计**：无网络请求，无遥测，不查元数据。从不读取或哈希文件内容——只在目标分类内按文件名匹配。
+
+## 截图
+
+<div align="center">
+  <img src="assets/review-import.png" width="90%" alt="审阅导入对话框：显示来源路径、目标分类、63 个文件 650.0 MB 共 63 个新增 0 个冲突的统计块、将要创建的 14 个分类列表，以及带逐文件状态的文件表格" />
+</div>
+
+<br/>
+
+<table>
+	<tr>
+		<td align="center"><strong>“文件”菜单中的 Import Folder…</strong></td>
+		<td align="center"><strong>插件管理器中已安装</strong></td>
+	</tr>
+	<tr>
+		<td align="center"><img src="assets/menu-entry.png" alt="展开的 Zotero 文件菜单，其中包含本插件添加的 Import Folder 条目" height="260" /></td>
+		<td align="center"><img src="assets/plugins-manager.png" alt="Zotero 插件管理器中显示 Folder Import，作者 Shuqi，版本 0.1.21" height="260" /></td>
+	</tr>
+	<tr>
+		<td align="center" colspan="2"><strong>导入完成</strong></td>
+	</tr>
+	<tr>
+		<td align="center" colspan="2"><img src="assets/import-complete.png" alt="导入完成对话框：进度条已满，显示 5 / 5 个文件，以及新增 5、替换 0、两者保留 0、忽略 0、失败 0 的统计" /></td>
+	</tr>
+</table>
 
 ## 安装
 
-从 [releases 页面](https://github.com/howtoexitvim/zotero-folder-import/releases)下载 `.xpi`，然后在 Zotero 中打开 **Tools → Add-ons → 齿轮图标 → Install Add-on From File…**，选择刚下载的文件。
+前往 [发布页面](https://github.com/howtoexitvim/zotero-folder-import/releases) 下载 `.xpi` 文件。当前版本为 **v0.1.21**。
 
-之后右键点击任意 collection，选择文件夹导入条目，即可挑选要导入的目录树。
+在 Zotero 中打开 **工具 → 插件 → 齿轮图标 → 从文件安装插件…**，选择刚下载的文件，若提示重启则重启。
 
-需要 Zotero 10。当前版本为 **v0.1.21**。
+然后选择 **文件 → Import Folder…**，或者右键点击任意分类。
 
-本插件没有自动更新通道。Zotero 10 要求每个可安装的 manifest 都带 `update_url`，因此构建时指向了一个保留的 `.invalid` 地址，它不可能承载更新服务。新版本请用同样的方式安装。
+需要 Zotero 10。
 
-## 文件是如何判定的
-
-判据只有一条：**目标 collection 里有没有同名文件**。这与文件管理器的行为一致 —— 不读取内容，也不扫描整个文库。
-
-| 状态 | 判据 | 行为 |
-| --- | --- | --- |
-| **New** | 目标 collection 内无同名文件 | 复制进 Zotero storage，保留原文件名 |
-| **Conflict** | 目标 collection 内已有同名文件 | 由你选择 Replace / Keep Both / Ignore |
-
-每次导入都会产生**自己的 attachment**。同一个 PDF 导入两个 collection，就是两个独立 item、两个独立 storage 目录，在一处删除、加标注、改标题都**不影响另一处**。代价是每个位置各占一份磁盘空间 —— 这与在 Finder 里把文件复制到两个文件夹是同一种取舍。
-
-删除行为取决于按键。在 collection 里按 Delete 走 `removeFromCollection`，只是把 item 从这个 collection 摘掉；Cmd+Delete 或在 My Library 根目录删除走 `trashTx`，item 本体进入垃圾桶。两者的提示语分别是 "Remove from Collection" 和 "Move to Trash"。
-
-Replace 会先导入新附件，确认成功之后才把旧的扔进垃圾桶——导入失败不会让你两份都没有。
-
-导入过程可以取消。导入中 Cancel 会变为停止导入，循环每轮检查标志位：已导入的保留，未导入的跳过，结果页会标记为已取消。执行器拒绝运行任何仍存在未解决冲突的计划。
-
-## 为什么不按 MD5 判重
-
-早期曾以为 Zotero 底层按 MD5 认文件，所以插件必须匹配哈希，否则 Cmd+Delete 会误删另一份。查证源码后确认这是错的，0.1.18 据此把判重改成了纯文件名：
-
-- attachment 的存储目录按**随机 item key** 划分，与内容无关，两个内容相同的 PDF 会存在两个目录里，各有一份物理副本。
-- `importFromFile` 中**没有任何哈希去重逻辑**。
-- Duplicate Items 视图按 **ISBN / DOI / 标题 + 作者**匹配，不按 MD5。
-- MD5（`attachmentSyncedHash`）**只用于 storage sync**，用来判断文件是否需要重新上传，与删除和去重无关。
-
-因此独立副本之间互不影响。此前观察到的「删一边另一边也消失」，完全来自本插件早期用 `linkExisting()` 复用同一个 item，该路径已被移除。
-
-## 已知的 Zotero 10 约束
-
-这些不是本插件的选择，而是平台限制，记录在此，或许能帮其他插件作者省下一些时间：
-
-- 插件对话框必须开在注册过的 `chrome://` URL 下。已安装 XPI 的 `rootURI` 是 `jar:` URL，从那里打开的窗口样式和脚本都加载不了，只会渲染成空白。
-- 对话框 body 必须是纯 XUL。混入一个 HTML 元素就会让解析器丢弃整个 body（`documentElement.children.length === 0`）。
-- 插件自带的 Fluent 文件在菜单和对话框里都解析不出来，所以所有文案都由脚本直接设置。
-- Zotero 源码位于 `/Applications/Zotero.app/Contents/Resources/app/omni.ja`，解包即可查证 API，不要靠猜。
-
-## 命令
+## 从源码构建
 
 ```bash
 npm install
 npm test
-npm run typecheck
 npm run build
-npm run verify
 ```
 
-`npm run build` 会生成 `dist/folder-import-<version>.xpi`，版本号取自 `addon/manifest.json`。构建使用 TypeScript 和 esbuild，测试使用 Vitest，共 57 个测试全部通过。
+`npm run build` 会生成 `dist/folder-import-<version>.xpi`。
 
-## 架构
+## 说明
 
-- `src/core/`：与文件系统解耦的扫描器、目标解析器、导入计划器、冲突策略和有序执行器。
-- `src/runtime/`：Zotero 10 适配层，覆盖 MenuManager、FilePicker、collection、存储附件、标注、垃圾桶和全文索引。
-- `src/dialog.ts`：预览、冲突选择、进度和完成界面。
-- `addon/`：manifest、XUL 对话框、CSS 和图标，会被复制到 XPI 根目录。
-- `tests/`：针对计划、冲突处理和变更顺序的行为测试，以及固定 XUL / chrome / 菜单接线方式的源码文本断言 —— 这些接线是本项目一点点试出来的。
+本插件没有自动更新通道——新版本的安装方式与首次安装完全相同。
 
-## 兼容性与隐私
-
-- 插件 ID：`folder-import@shuqi.local`
-- Zotero：`10.0` 至 `10.0.*`
-- 不发起网络请求，不做遥测，不查询元数据。文件仅按目标 collection 内的文件名匹配，内容既不会被读取也不会被哈希。
-
-## 许可证
+## License
 
 [MIT](LICENSE)
