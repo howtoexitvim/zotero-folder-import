@@ -77,3 +77,4 @@ There is no auto-update channel — new versions are installed the same way as t
 ## License
 
 [MIT](LICENSE)
+
